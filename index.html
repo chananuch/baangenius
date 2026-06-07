@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>บ้านจีเนียส - ระบบจัดการโรงเรียน</title>
+<title>The Speak Club - ระบบจัดการโรงเรียน</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
@@ -399,7 +399,7 @@
 <div class="pin-screen" id="pinScreen">
   <div class="pin-card">
     <div class="pin-logo">🏠</div>
-    <div class="pin-title">บ้านจีเนียส</div>
+    <div class="pin-title">The Speak Club</div>
     <div class="pin-sub">กรอกรหัส 4 หลักเพื่อเข้าใช้งาน</div>
     <div class="pin-dots" id="pinDots">
       <div class="pin-dot" id="pd0"></div>
@@ -488,7 +488,7 @@ const firebaseConfig = {
 <aside class="sidebar" id="sidebar">
   <div class="sidebar-logo">
     <div class="logo-icon">🏠</div>
-    <div class="school-name">บ้านจีเนียส</div>
+    <div class="school-name">The Speak Club</div>
     <div class="school-sub">Learning Center</div>
   </div>
 
@@ -3202,7 +3202,7 @@ function applyRole(role) {
   // แสดง role badge ใน topbar
   const badge = document.getElementById('roleBadge');
   if (badge) {
-    badge.textContent = role === 'owner' ? '👑 เจ้าของ' : '🙋 ผู้ช่วย';
+    badge.textContent = role === 'owner' ? '👑 Director' : '🙋 ผู้ช่วย';
     badge.style.color = role === 'owner' ? 'var(--primary)' : 'var(--warning)';
   }
 }
