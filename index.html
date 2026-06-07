@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>The Speak Club - ระบบจัดการโรงเรียน</title>
+<title>The Speak Club - school system</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
@@ -2743,7 +2743,8 @@ function enrollCardHTML(e) {
     <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;gap:8px">
       <div>
         <div style="font-weight:800;font-size:14px">${e.studentName}</div>
-        <div style="font-size:12px;color:var(--gray-500)">${e.courseName}</div>
+        <div style="font-size:12px;color:var(--primary);cursor:pointer;text-decoration:underline dotted" onclick="showPage('courses',null)" title="ดูหน้าคอร์สเรียน">${e.courseName}</div>
+        ${course && course.day ? `<div style="font-size:11px;color:var(--gray-500);margin-top:2px">📅 ${course.day} &nbsp; 🕐 ${course.time}</div>` : ''}
       </div>
       <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end">
         <span class="badge ${e.paymentType==='monthly'?'badge-info':'badge-success'}" style="font-size:10px;white-space:nowrap">
@@ -2859,7 +2860,8 @@ function openAddEnrollment() {
       </div>
       <div class="form-group">
         <label>คอร์ส</label>
-        <select id="enr_course" onchange="enrAutoFill()">${DB.courses.map(c=>`<option data-fee="${c.fee}">${c.name}</option>`).join('')}</select>
+        <select id="enr_course" onchange="enrAutoFill()">${[...DB.courses].sort((a,b)=>courseSort(a.name,b.name)).map(c=>`<option data-fee="${c.fee}" data-hours="${c.sessions||8}">${c.name}</option>`).join('')}</select>
+        <div id="enr_course_hint" style="font-size:11px;color:var(--primary);margin-top:4px"></div>
       </div>
     </div>
     <div class="form-group">
@@ -2903,9 +2905,23 @@ function openAddEnrollment() {
 function enrAutoFill() {
   const sel = document.getElementById('enr_course');
   if (!sel) return;
-  const fee = sel.options[sel.selectedIndex]?.dataset?.fee;
+  const opt = sel.options[sel.selectedIndex];
+  const course = DB.courses.find(c => c.name === sel.value);
+  // ดึงค่าเรียนจากคอร์สอัตโนมัติ
   const feeInput = document.getElementById('enr_fee');
-  if (fee && feeInput && !feeInput.value) feeInput.value = fee;
+  if (feeInput && opt?.dataset?.fee) feeInput.value = opt.dataset.fee;
+  // ดึงชั่วโมงจากคอร์สอัตโนมัติ (sessions*2 ชม./ครั้ง)
+  const hoursInput = document.getElementById('enr_hours');
+  if (hoursInput && course) {
+    const hrs = (course.sessions || 1) * 2; // 2 ชม./ครั้ง
+    hoursInput.value = hrs;
+  }
+  // แสดงวัน/เวลาเรียน
+  const hint = document.getElementById('enr_course_hint');
+  if (hint && course) {
+    hint.textContent = course.day && course.time ? `📅 ${course.day}  🕐 ${course.time}  👩‍🏫 ${course.teacher||''}` : '';
+  }
+  updateDepositPreview();
 }
 
 function toggleEnrFields() {
