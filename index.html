@@ -501,10 +501,10 @@ const firebaseConfig = {
     <span class="nav-badge" id="badge-students">24</span>
   </div>
   <div class="nav-item" data-page="teachers" onclick="showPage('teachers',this)">
-    <span class="nav-icon">👩‍🏫</span> อาจารย์
+    <span class="nav-icon">👩‍🏫</span> Teachers
   </div>
   <div class="nav-item" data-page="courses" onclick="showPage('courses',this)">
-    <span class="nav-icon">📚</span> คอร์ส/บทเรียน
+    <span class="nav-icon">📚</span> คอร์สเรียน
   </div>
   <div class="nav-item" data-page="schedule" onclick="showPage('schedule',this)">
     <span class="nav-icon">📅</span> ตารางเรียน
@@ -518,7 +518,7 @@ const firebaseConfig = {
     <span class="nav-icon">📋</span> ลงทะเบียน/ชั่วโมง
   </div>
   <div class="nav-item" data-page="makeup" onclick="showPage('makeup',this)">
-    <span class="nav-icon">🔄</span> ค่าขอเรียนชดเชย
+    <span class="nav-icon">🔄</span> คำขอเรียนชดเชย
   </div>
   <div class="nav-item" data-page="progress" onclick="showPage('progress',this)">
     <span class="nav-icon">📈</span> ความก้าวหน้านักเรียน
@@ -529,7 +529,7 @@ const firebaseConfig = {
     <span class="nav-icon">💰</span> ใบแจ้งหนี้/การเงิน
   </div>
   <div class="nav-item" data-page="salary" onclick="showPage('salary',this)">
-    <span class="nav-icon">💳</span> ค่าตอบแทนอาจารย์
+    <span class="nav-icon">💳</span> ค่าตอบแทน Teachers
   </div>
 
   <div class="nav-section-label" data-owner="1">ทั่วไป</div>
@@ -549,12 +549,12 @@ const firebaseConfig = {
 
 <!-- BOTTOM NAV MORE MENU -->
 <div class="bnav-more-menu" id="bnavMoreMenu">
-  <button class="bnav-more-item" onclick="bnavGo('teachers')"><span class="nav-icon">👩‍🏫</span> อาจารย์</button>
-  <button class="bnav-more-item" onclick="bnavGo('courses')"><span class="nav-icon">📚</span> คอร์ส/บทเรียน</button>
+  <button class="bnav-more-item" onclick="bnavGo('teachers')"><span class="nav-icon">👩‍🏫</span> Teachers</button>
+  <button class="bnav-more-item" onclick="bnavGo('courses')"><span class="nav-icon">📚</span> คอร์สเรียน</button>
   <button class="bnav-more-item" onclick="bnavGo('schedule')"><span class="nav-icon">📅</span> ตารางเรียน</button>
-  <button class="bnav-more-item" onclick="bnavGo('makeup')"><span class="nav-icon">🔄</span> ค่าขอเรียนชดเชย</button>
+  <button class="bnav-more-item" onclick="bnavGo('makeup')"><span class="nav-icon">🔄</span> คำขอเรียนชดเชย</button>
   <button class="bnav-more-item" onclick="bnavGo('progress')"><span class="nav-icon">📈</span> ความก้าวหน้า</button>
-  <button class="bnav-more-item" onclick="bnavGo('salary')"><span class="nav-icon">💳</span> ค่าตอบแทนอาจารย์</button>
+  <button class="bnav-more-item" onclick="bnavGo('salary')"><span class="nav-icon">💳</span> ค่าตอบแทน Teachers</button>
   <button class="bnav-more-item" onclick="bnavGo('holidays')"><span class="nav-icon">🏖️</span> วันหยุด</button>
   <button class="bnav-more-item" onclick="bnavGo('announcements')"><span class="nav-icon">📣</span> ประกาศ</button>
 </div>
@@ -865,11 +865,11 @@ let currentPage = 'dashboard';
 // NAVIGATION
 // ============================================================
 const pageTitles = {
-  dashboard:'แดชบอร์ด', students:'นักเรียน', teachers:'อาจารย์',
-  courses:'คอร์ส/บทเรียน', schedule:'ตารางเรียน', attendance:'เช็คชื่อ',
+  dashboard:'แดชบอร์ด', students:'นักเรียน', teachers:'Teachers',
+  courses:'คอร์สเรียน', schedule:'ตารางเรียน', attendance:'เช็คชื่อ',
   enrollment:'ลงทะเบียน/ชั่วโมงเรียน',
-  makeup:'ค่าขอเรียนชดเชย', progress:'ความก้าวหน้านักเรียน',
-  finance:'ใบแจ้งหนี้/การเงิน', salary:'ค่าตอบแทนอาจารย์',
+  makeup:'คำขอเรียนชดเชย', progress:'ความก้าวหน้านักเรียน',
+  finance:'ใบแจ้งหนี้/การเงิน', salary:'ค่าตอบแทน Teachers',
   holidays:'วันหยุด', announcements:'ประกาศ'
 };
 
@@ -1431,7 +1431,7 @@ function openEditTeacher(id) {
         ${myCourses.length===0?'<span style="color:var(--gray-500);font-size:12px">ยังไม่มีคอร์ส</span>':
           myCourses.map(c=>`<span class="badge badge-info">${c.name}</span>`).join('')}
       </div>
-      <div style="font-size:11px;color:var(--gray-500);margin-top:4px">แก้ไขอาจารย์ของคอร์สได้ที่หน้า คอร์ส/บทเรียน</div>
+      <div style="font-size:11px;color:var(--gray-500);margin-top:4px">แก้ไขอาจารย์ของคอร์สได้ที่หน้า คอร์สเรียน</div>
     </div>
   `,`
     <button class="btn btn-outline" onclick="closeModal()">ยกเลิก</button>
@@ -1459,6 +1459,19 @@ function updateTeacher(id) {
 }
 
 // ============================================================
+// COURSE ORDER HELPER
+// ============================================================
+const COURSE_ORDER = ['Speaking 1','Speaking 2','Phonics 1','Phonics 2','Phonics 3','Phonics 4'];
+function courseSort(a, b) {
+  const ai = COURSE_ORDER.findIndex(n => a.toLowerCase().includes(n.toLowerCase()));
+  const bi = COURSE_ORDER.findIndex(n => b.toLowerCase().includes(n.toLowerCase()));
+  if (ai === -1 && bi === -1) return a.localeCompare(b);
+  if (ai === -1) return 1;
+  if (bi === -1) return -1;
+  return ai - bi;
+}
+
+// ============================================================
 // COURSES
 // ============================================================
 function renderCourses(el) {
@@ -1467,7 +1480,7 @@ function renderCourses(el) {
       <button class="btn btn-primary owner-only" onclick="openAddCourse()">+ เพิ่มคอร์ส</button>
     </div>
     <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px">
-      ${DB.courses.map(c=>{
+      ${[...DB.courses].sort((a,b)=>courseSort(a.name,b.name)).map(c=>{
         const studentCount = DB.students.filter(s=>s.courses.includes(c.name)).length;
         return `
         <div class="card" style="border-top:4px solid ${c.color}">
@@ -2383,7 +2396,7 @@ function renderSalary(el) {
     </div>
     <div class="card">
       <div class="card-header">
-        <span class="card-title">ค่าตอบแทนอาจารย์</span>
+        <span class="card-title">ค่าตอบแทน Teachers</span>
         <button class="btn btn-primary btn-sm" onclick="openAddSalary()">+ เพิ่มรายการ</button>
       </div>
       <div class="table-wrap">
@@ -2782,28 +2795,34 @@ function enrollCardHTML(e) {
 function renderEnrollCards(list) {
   if (!list.length) return '<div class="empty"><div class="empty-icon">📋</div>ไม่มีข้อมูล</div>';
 
-  // Group by teacher
+  // Group by course name
   const groups = {};
   list.forEach(e => {
-    const course = DB.courses.find(c => c.name === e.courseName);
-    const teacher = course ? (course.teacher || 'ไม่ระบุครู') : 'ไม่ระบุครู';
-    if (!groups[teacher]) groups[teacher] = [];
-    groups[teacher].push(e);
+    const name = e.courseName || 'ไม่ระบุคอร์ส';
+    if (!groups[name]) groups[name] = [];
+    groups[name].push(e);
   });
 
-  const teacherNames = Object.keys(groups).sort();
-  return teacherNames.map(teacher => `
+  const courseNames = Object.keys(groups).sort(courseSort);
+  return courseNames.map(courseName => {
+    const course = DB.courses.find(c => c.name === courseName);
+    const teacher = course ? (course.teacher || 'ไม่ระบุครู') : 'ไม่ระบุครู';
+    const color = course ? course.color : 'var(--primary)';
+    return `
     <div style="margin-bottom:24px">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid var(--primary-light)">
-        <span style="font-size:20px">👩‍🏫</span>
-        <span style="font-weight:700;font-size:15px;color:var(--primary-dark)">${teacher}</span>
-        <span style="font-size:12px;color:var(--gray-500)">(${groups[teacher].length} คน)</span>
+        <span style="font-size:20px">📚</span>
+        <span style="font-weight:800;font-size:15px;color:var(--primary-dark)">${courseName}</span>
+        <span style="font-size:12px;color:var(--gray-500);display:flex;align-items:center;gap:4px">
+          <span>👩‍🏫 ${teacher}</span>
+          <span style="margin-left:6px">(${groups[courseName].length} คน)</span>
+        </span>
       </div>
       <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px">
-        ${groups[teacher].map(enrollCardHTML).join('')}
+        ${groups[courseName].map(enrollCardHTML).join('')}
       </div>
     </div>
-  `).join('');
+  `}).join('');
 }
 
 function filterEnrollments(type, btn) {
