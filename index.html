@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>The Speak Club - ระบบจัดการโรงเรียน</title>
+<title>SpeakBright - ระบบจัดการโรงเรียน</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
@@ -399,7 +399,7 @@
 <div class="pin-screen" id="pinScreen">
   <div class="pin-card">
     <div class="pin-logo">🏠</div>
-    <div class="pin-title">The Speak Club</div>
+    <div class="pin-title">SpeakBright</div>
     <div class="pin-sub">กรอกรหัส 4 หลักเพื่อเข้าใช้งาน</div>
     <div class="pin-dots" id="pinDots">
       <div class="pin-dot" id="pd0"></div>
@@ -488,7 +488,7 @@ const firebaseConfig = {
 <aside class="sidebar" id="sidebar">
   <div class="sidebar-logo">
     <div class="logo-icon">🏠</div>
-    <div class="school-name">The Speak Club</div>
+    <div class="school-name">SpeakBright</div>
     <div class="school-sub">Learning Center</div>
   </div>
 
@@ -1116,27 +1116,44 @@ function renderStudents(el) {
         <span class="search-icon">🔍</span>
         <input type="text" placeholder="ค้นหานักเรียน..." id="studentSearch" oninput="filterStudents()">
       </div>
-      <select id="studentFilter" onchange="filterStudents()" style="padding:9px 12px;border:1.5px solid var(--gray-200);border-radius:8px;font-size:13px">
-        <option value="">ทุกสถานะ</option>
-        <option value="active">กำลังเรียน</option>
-        <option value="inactive">ลาออก</option>
-      </select>
       <button class="btn btn-primary owner-only" onclick="openAddStudent()">+ เพิ่มนักเรียน</button>
     </div>
     <div class="card">
       <div class="table-wrap">
         <table id="studentTable">
-          <thead><tr><th>ชื่อ-สกุล</th><th>ชื่อเล่น</th><th>คอร์ส</th><th>ผู้ปกครอง</th><th>ยอดค้างชำระ</th><th>สถานะ</th><th>จัดการ</th></tr></thead>
+          <thead><tr><th>ชื่อ-สกุล</th><th>ชื่อเล่น</th><th>คอร์ส</th><th>ผู้ปกครอง</th><th>ยอดค้างชำระ</th><th>จัดการ</th></tr></thead>
           <tbody id="studentBody"></tbody>
         </table>
+      </div>
+    </div>
+    <div style="margin-top:16px">
+      <button onclick="toggleFormerStudents()" style="background:none;border:none;cursor:pointer;font-size:14px;color:var(--gray-500);display:flex;align-items:center;gap:6px;padding:4px 0" id="formerStudentsToggle">
+        <span id="formerToggleIcon">▶</span> อดีตนักเรียน (<span id="formerCount">0</span> คน)
+      </button>
+      <div id="formerStudentsSection" style="display:none;margin-top:12px">
+        <div class="card">
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>ชื่อ-สกุล</th><th>ชื่อเล่น</th><th>คอร์สเดิม</th><th>ผู้ปกครอง</th><th>ชม.คงเหลือ</th><th>จัดการ</th></tr></thead>
+              <tbody id="formerStudentBody"></tbody>
+            </table>
+          </div>
+        </div>
       </div>
     </div>
   `;
   filterStudents();
 }
 
+function toggleFormerStudents() {
+  const sec = document.getElementById('formerStudentsSection');
+  const icon = document.getElementById('formerToggleIcon');
+  const hidden = sec.style.display === 'none';
+  sec.style.display = hidden ? 'block' : 'none';
+  icon.textContent = hidden ? '▼' : '▶';
+}
+
 function getStudentBalance(studentName) {
-  // Sum unpaid/overdue invoices for this student
   return (DB.invoices || [])
     .filter(inv => inv.student === studentName && (inv.status === 'unpaid' || inv.status === 'overdue'))
     .reduce((sum, inv) => sum + (inv.amount || 0), 0);
@@ -1144,31 +1161,80 @@ function getStudentBalance(studentName) {
 
 function filterStudents() {
   const q = (document.getElementById('studentSearch')?.value||'').toLowerCase();
-  const f = document.getElementById('studentFilter')?.value||'';
-  const rows = DB.students
-    .filter(s=>(s.name.toLowerCase().includes(q)||s.nickname.toLowerCase().includes(q)) && (!f||s.status===f))
-    .map(s=>{
-      const balance = getStudentBalance(s.name);
-      const overdueInvs = (DB.invoices||[]).filter(inv=>inv.student===s.name && inv.status==='overdue');
-      const balanceHtml = balance > 0
-        ? `<span style="color:${overdueInvs.length?'var(--danger)':'var(--warning)'};font-weight:700;cursor:pointer" onclick="showStudentInvoices(${s.id})" title="คลิกดูใบแจ้งหนี้">฿${balance.toLocaleString()}${overdueInvs.length?' ⚠️':''}</span>`
-        : '<span style="color:var(--success)">ชำระแล้ว</span>';
-      return `
-      <tr>
-        <td><strong style="cursor:pointer;text-decoration:underline dotted" onclick="openStudentDetail(${s.id})">${s.name}</strong></td>
-        <td style="cursor:pointer" onclick="openStudentDetail(${s.id})">${s.nickname}</td>
-        <td>${s.courses.map(c=>`<span class="badge badge-info" style="margin:1px">${c}</span>`).join('')}</td>
-        <td>${s.parent}</td>
-        <td>${balanceHtml}</td>
-        <td>${s.status==='active'?'<span class="badge badge-success">กำลังเรียน</span>':'<span class="badge badge-gray">ลาออก</span>'}</td>
-        <td style="white-space:nowrap">
-          <button class="btn btn-icon btn-sm owner-only" title="แก้ไข" onclick="openEditStudent(${s.id})">✏️</button>
-          <button class="btn btn-icon btn-sm" title="ดูประวัติ" onclick="openStudentDetail(${s.id})">👁️</button>
-          <button class="btn btn-icon btn-sm owner-only" title="ลบ" onclick="deleteStudent(${s.id})" style="color:var(--danger)">🗑️</button>
-        </td>
-      </tr>
-    `;}).join('');
-  document.getElementById('studentBody').innerHTML = rows || '<tr><td colspan="7" class="empty">ไม่พบนักเรียน</td></tr>';
+
+  // Active students
+  const active = DB.students.filter(s => s.status === 'active' && (s.name.toLowerCase().includes(q) || s.nickname.toLowerCase().includes(q)));
+  const rows = active.map(s => {
+    const balance = getStudentBalance(s.name);
+    const overdueInvs = (DB.invoices||[]).filter(inv=>inv.student===s.name && inv.status==='overdue');
+    const balanceHtml = balance > 0
+      ? `<span style="color:${overdueInvs.length?'var(--danger)':'var(--warning)'};font-weight:700;cursor:pointer" onclick="showStudentInvoices(${s.id})" title="คลิกดูใบแจ้งหนี้">฿${balance.toLocaleString()}${overdueInvs.length?' ⚠️':''}</span>`
+      : '<span style="color:var(--success)">ชำระแล้ว</span>';
+    return `
+    <tr>
+      <td><strong style="cursor:pointer;text-decoration:underline dotted" onclick="openStudentDetail(${s.id})">${s.name}</strong></td>
+      <td style="cursor:pointer" onclick="openStudentDetail(${s.id})">${s.nickname}</td>
+      <td>${s.courses.map(c=>`<span class="badge badge-info" style="margin:1px">${c}</span>`).join('')}</td>
+      <td>${s.parent}</td>
+      <td>${balanceHtml}</td>
+      <td style="white-space:nowrap">
+        <button class="btn btn-icon btn-sm owner-only" title="แก้ไข" onclick="openEditStudent(${s.id})">✏️</button>
+        <button class="btn btn-icon btn-sm" title="ดูประวัติ" onclick="openStudentDetail(${s.id})">👁️</button>
+        <button class="btn btn-sm owner-only" style="font-size:11px;padding:3px 8px;background:var(--gray-200);border:none;border-radius:6px;cursor:pointer;color:var(--gray-600)" onclick="archiveStudent(${s.id})" title="ย้ายไปอดีตนักเรียน">📦 ไม่ใช้งาน</button>
+        <button class="btn btn-icon btn-sm owner-only" title="ลบ" onclick="deleteStudent(${s.id})" style="color:var(--danger)">🗑️</button>
+      </td>
+    </tr>`;
+  }).join('');
+  document.getElementById('studentBody').innerHTML = rows || '<tr><td colspan="6" class="empty">ไม่พบนักเรียน</td></tr>';
+
+  // Former students
+  const former = DB.students.filter(s => s.status === 'inactive' && (s.name.toLowerCase().includes(q) || s.nickname.toLowerCase().includes(q)));
+  document.getElementById('formerCount').textContent = DB.students.filter(s=>s.status==='inactive').length;
+  const formerRows = former.map(s => {
+    const remainHours = DB.enrollments.filter(e => e.studentName === s.name && e.status === 'active').reduce((sum,e) => sum + Math.max(0,(e.totalHours||0)-(e.usedHours||0)), 0);
+    return `
+    <tr style="opacity:0.75">
+      <td><strong style="cursor:pointer;text-decoration:underline dotted" onclick="openStudentDetail(${s.id})">${s.name}</strong></td>
+      <td>${s.nickname}</td>
+      <td>${(s.courses||[]).map(c=>`<span class="badge badge-gray" style="margin:1px">${c}</span>`).join('') || '-'}</td>
+      <td>${s.parent}</td>
+      <td>${remainHours > 0 ? `<span style="color:var(--warning);font-weight:700">${remainHours} ชม.</span>` : '<span style="color:var(--gray-400)">-</span>'}</td>
+      <td style="white-space:nowrap">
+        <button class="btn btn-sm owner-only" style="font-size:11px;padding:3px 8px;background:#E8F5E9;border:none;border-radius:6px;cursor:pointer;color:var(--success)" onclick="restoreStudent(${s.id})">🔄 เรียกคืน</button>
+        <button class="btn btn-icon btn-sm owner-only" title="ลบถาวร" onclick="deleteStudent(${s.id})" style="color:var(--danger)">🗑️</button>
+      </td>
+    </tr>`;
+  }).join('');
+  document.getElementById('formerStudentBody').innerHTML = formerRows || '<tr><td colspan="6" class="empty">ไม่มีอดีตนักเรียน</td></tr>';
+}
+
+function archiveStudent(id) {
+  const s = DB.students.find(x=>x.id===id);
+  if (!confirm(`ย้าย "${s.name}" ไปอดีตนักเรียน?\n\nข้อมูลยังถูกเก็บไว้ สามารถเรียกคืนได้ภายหลัง`)) return;
+  s.status = 'inactive';
+  s.archivedDate = new Date().toISOString().split('T')[0];
+  DB.enrollments.filter(e => e.studentName === s.name && e.status === 'active').forEach(e => {
+    e._pausedStatus = 'active';
+    e.status = 'inactive';
+  });
+  document.getElementById('badge-students').textContent = DB.students.filter(s=>s.status==='active').length;
+  saveDB();
+  filterStudents();
+  showToast(`ย้าย "${s.name}" ไปอดีตนักเรียนแล้ว`);
+}
+
+function restoreStudent(id) {
+  const s = DB.students.find(x=>x.id===id);
+  s.status = 'active';
+  delete s.archivedDate;
+  DB.enrollments.filter(e => e.studentName === s.name && e._pausedStatus === 'active').forEach(e => {
+    e.status = 'active';
+    delete e._pausedStatus;
+  });
+  document.getElementById('badge-students').textContent = DB.students.filter(s=>s.status==='active').length;
+  saveDB();
+  filterStudents();
+  showToast(`เรียกคืน "${s.name}" กลับมาแล้ว ✅`);
 }
 
 function showStudentInvoices(studentId) {
@@ -1603,7 +1669,7 @@ function removeFromCourse(courseId, studentId) {
     ${notEnrolled.length>0?`
       <div style="font-weight:700;margin:16px 0 8px">เพิ่มนักเรียน</div>
       <select id="add_to_course_student" style="width:100%;margin-bottom:8px">
-        ${notEnrolled.map(st=>`<option value="${st.id}">${st.name}</option>`).join('')}
+               ${notEnrolled.map(st=>`<option value="${st.id}">${st.name}</option>`).join('')}
       </select>
       <button class="btn btn-primary btn-sm" style="width:100%" onclick="addToCourse(${courseId})">+ เพิ่มเข้าคอร์ส</button>
     `:''}
@@ -1611,74 +1677,26 @@ function removeFromCourse(courseId, studentId) {
   showToast(`ลบ ${s.name} ออกจากคอร์สสำเร็จ`);
 }
 
-function deleteCourse(id) {
-  const c = DB.courses.find(x=>x.id===id);
-  if(!confirm(`ลบคอร์ส "${c.name}" ออกจากระบบ?\nนักเรียนที่สมัครคอร์สนี้จะถูกถอดออกด้วย`)) return;
-  // Remove course from all students
-  DB.students.forEach(s=>{ s.courses = s.courses.filter(name=>name!==c.name); });
-  DB.courses = DB.courses.filter(x=>x.id!==id);
-  saveDB();
-  showPage(currentPage, null);
-  showToast(`ลบคอร์ส "${c.name}" สำเร็จ`);
-}
-
-function openAddCourse() {
-  openModal('เพิ่มคอร์สใหม่', `
-    <div class="form-group"><label>ชื่อคอร์ส</label><input id="c_name" placeholder="เช่น ภาษาญี่ปุ่น ม.ต้น"></div>
-    <div class="form-row">
-      <div class="form-group">
-        <label>อาจารย์ผู้สอน</label>
-        <select id="c_teacher">
-          ${DB.teachers.map(t=>`<option>${t.name}</option>`).join('')}
-        </select>
-      </div>
-      <div class="form-group"><label>ค่าเรียน/เดือน (บาท)</label><input id="c_fee" type="number" placeholder="2500"></div>
-    </div>
-    <div class="form-row">
-      <div class="form-group"><label>วันเรียน</label><input id="c_day" placeholder="จ-พ"></div>
-      <div class="form-group"><label>เวลา</label><input id="c_time" placeholder="16:00-18:00"></div>
-    </div>
-  `,`
-    <button class="btn btn-outline" onclick="closeModal()">ยกเลิก</button>
-    <button class="btn btn-primary" onclick="saveCourse()">บันทึก</button>
-  `);
-}
-
-function saveCourse() {
-  const name = document.getElementById('c_name').value.trim();
-  if(!name) { showToast('กรุณากรอกชื่อคอร์ส',''); return; }
-  const colors = ['#2196F3','#4CAF50','#FF9800','#9C27B0','#F44336','#00BCD4'];
-  DB.courses.push({
-    id: DB.courses.length+1, name, students:0,
-    teacher: document.getElementById('c_teacher').value,
-    fee: Number(document.getElementById('c_fee').value)||0,
-    day: document.getElementById('c_day').value,
-    time: document.getElementById('c_time').value,
-    sessions:2, color: colors[DB.courses.length % colors.length]
-  });
-  saveDB();
-  closeModal();
-  renderCourses(document.getElementById('mainContent'));
-  showToast(`เพิ่มคอร์ส "${name}" สำเร็จ`);
-}
-
 function openEditCourse(id) {
   const c = DB.courses.find(x=>x.id===id);
   openModal('แก้ไขคอร์ส', `
-    <div class="form-group"><label>ชื่อคอร์ส</label><input id="ec_name" value="${c.name}"></div>
     <div class="form-row">
-      <div class="form-group">
-        <label>อาจารย์ผู้สอน</label>
+      <div class="form-group"><label>ชื่อคอร์ส</label><input id="ec_name" value="${c.name}"></div>
+      <div class="form-group"><label>อาจารย์</label>
         <select id="ec_teacher">
-          ${DB.teachers.map(t=>`<option value="${t.name}" ${t.name===c.teacher?'selected':''}>${t.name} (${t.subject})</option>`).join('')}
+          ${DB.teachers.map(t=>`<option value="${t.name}" ${c.teacher===t.name?'selected':''}>${t.name}</option>`).join('')}
         </select>
       </div>
-      <div class="form-group"><label>ค่าเรียน (บาท)</label><input id="ec_fee" type="number" value="${c.fee}"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>ค่าเรียน/เดือน (บาท)</label><input id="ec_fee" type="number" value="${c.fee}"></div>
+      <div class="form-group"><label>จำนวนครั้ง/สัปดาห์</label><input id="ec_sessions" type="number" value="${c.sessions}"></div>
     </div>
     <div class="form-row">
       <div class="form-group"><label>วันเรียน</label><input id="ec_day" value="${c.day}"></div>
-      <div class="form-group"><label>เวลา</label><input id="ec_time" value="${c.time}"></div>
+      <div class="form-group"><label>เวลาเรียน</label><input id="ec_time" value="${c.time}"></div>
     </div>
+    <div class="form-group"><label>สีคอร์ส</label><input id="ec_color" type="color" value="${c.color}" style="width:60px;height:36px;padding:2px;border-radius:8px;cursor:pointer"></div>
   `,`
     <button class="btn btn-outline" onclick="closeModal()">ยกเลิก</button>
     <button class="btn btn-primary" onclick="updateCourse(${id})">บันทึก</button>
@@ -1687,170 +1705,102 @@ function openEditCourse(id) {
 
 function updateCourse(id) {
   const c = DB.courses.find(x=>x.id===id);
-  const oldName = c.name;
   c.name = document.getElementById('ec_name').value;
   c.teacher = document.getElementById('ec_teacher').value;
-  c.fee = Number(document.getElementById('ec_fee').value)||c.fee;
+  c.fee = Number(document.getElementById('ec_fee').value)||0;
+  c.sessions = Number(document.getElementById('ec_sessions').value)||0;
   c.day = document.getElementById('ec_day').value;
   c.time = document.getElementById('ec_time').value;
-  // Update course name in students if changed
-  if (oldName !== c.name) {
-    DB.students.forEach(s=>{ const i=s.courses.indexOf(oldName); if(i>-1) s.courses[i]=c.name; });
-  }
+  c.color = document.getElementById('ec_color').value;
   saveDB();
   closeModal();
-  showPage(currentPage, null);
-  showToast('บันทึกสำเร็จ');
+  renderCourses(document.getElementById('mainContent'));
+  showToast('บันทึกคอร์สสำเร็จ');
+}
+
+function deleteCourse(id) {
+  const c = DB.courses.find(x=>x.id===id);
+  if(!confirm(`ลบคอร์ส "${c.name}"?`)) return;
+  DB.courses = DB.courses.filter(x=>x.id!==id);
+  saveDB();
+  renderCourses(document.getElementById('mainContent'));
+  showToast(`ลบคอร์ส "${c.name}" สำเร็จ`);
+}
+
+function openAddCourse() {
+  openModal('เพิ่มคอร์สใหม่', `
+    <div class="form-row">
+      <div class="form-group"><label>ชื่อคอร์ส</label><input id="nc_name" placeholder="เช่น คณิตศาสตร์ ม.2"></div>
+      <div class="form-group"><label>อาจารย์</label>
+        <select id="nc_teacher">
+          ${DB.teachers.map(t=>`<option value="${t.name}">${t.name}</option>`).join('')}
+        </select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>ค่าเรียน/เดือน (บาท)</label><input id="nc_fee" type="number" placeholder="2500"></div>
+      <div class="form-group"><label>จำนวนครั้ง/สัปดาห์</label><input id="nc_sessions" type="number" placeholder="4"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>วันเรียน</label><input id="nc_day" placeholder="จ-ศ"></div>
+      <div class="form-group"><label>เวลาเรียน</label><input id="nc_time" placeholder="16:00-18:00"></div>
+    </div>
+    <div class="form-group"><label>สีคอร์ส</label><input id="nc_color" type="color" value="#2196F3" style="width:60px;height:36px;padding:2px;border-radius:8px;cursor:pointer"></div>
+  `,`
+    <button class="btn btn-outline" onclick="closeModal()">ยกเลิก</button>
+    <button class="btn btn-primary" onclick="saveCourse()">บันทึก</button>
+  `);
+}
+
+function saveCourse() {
+  const name = document.getElementById('nc_name').value.trim();
+  if(!name) { showToast('กรุณากรอกชื่อคอร์ส',''); return; }
+  const maxId = Math.max(...DB.courses.map(c=>c.id), 0);
+  DB.courses.push({
+    id: maxId+1,
+    name,
+    teacher: document.getElementById('nc_teacher').value,
+    students: 0,
+    fee: Number(document.getElementById('nc_fee').value)||0,
+    sessions: Number(document.getElementById('nc_sessions').value)||0,
+    day: document.getElementById('nc_day').value,
+    time: document.getElementById('nc_time').value,
+    color: document.getElementById('nc_color').value
+  });
+  saveDB();
+  closeModal();
+  renderCourses(document.getElementById('mainContent'));
+  showToast(`เพิ่มคอร์ส "${name}" สำเร็จ`);
 }
 
 // ============================================================
 // SCHEDULE
 // ============================================================
-const days = ['อา.','จ.','อ.','พ.','พฤ.','ศ.','ส.'];
-const hours = ['08:00','09:00','10:00','11:00','12:00','13:00','14:00','15:00','16:00','17:00','18:00'];
-
-// Parse Thai day abbreviations like 'จ-พ' → [1,3], 'อ-ศ' → [2,5], 'ส' → [6]
-function parseDays(dayStr) {
-  const dayMap = {'อา':0,'จ':1,'อ':2,'พ':3,'พฤ':4,'ศ':5,'ส':6};
-  const result = [];
-  (dayStr||'').split(/[-,\s]+/).forEach(p => {
-    const trimmed = p.trim();
-    if (dayMap[trimmed] !== undefined) result.push(dayMap[trimmed]);
-  });
-  return [...new Set(result)];
-}
-
-// Parse '16:00-18:00' → {start:16.0, end:18.0}  (decimal hours for accurate positioning)
-function parseTimeRange(timeStr) {
-  const m = (timeStr||'').match(/(\d+):(\d+)-(\d+):(\d+)/);
-  if (!m) return {start:0, end:0};
-  return {
-    start: Number(m[1]) + Number(m[2])/60,
-    end:   Number(m[3]) + Number(m[4])/60
-  };
-}
-
 function renderSchedule(el) {
-  const today = new Date().getDay();
-  const HOUR_H = 60;   // px per hour
-  const START_H = 8;
-  const END_H = 20;
-  const TOTAL_H = (END_H - START_H) * HOUR_H;
-
-  // Group courses by day with decimal start/end times
-  const dayItems = {};
-  DB.courses.forEach(c => {
-    const courseDays = parseDays(c.day);
-    const {start, end} = parseTimeRange(c.time);
-    if (start === end) return;
-    courseDays.forEach(d => {
-      if (!dayItems[d]) dayItems[d] = [];
-      dayItems[d].push({course: c, start, end});
-    });
-  });
-
-  // Assign side-by-side columns for overlapping events within a day
-  function assignColumns(items) {
-    const sorted = [...items].sort((a,b) => a.start - b.start);
-    const colEnds = [];
-    const result = [];
-    sorted.forEach(item => {
-      let col = colEnds.findIndex(e => e <= item.start + 0.01);
-      if (col === -1) { col = colEnds.length; colEnds.push(0); }
-      colEnds[col] = item.end;
-      result.push({...item, col});
-    });
-    const maxCols = colEnds.length;
-    return result.map(r => ({...r, maxCols}));
-  }
-
-  // Build time axis labels
-  let timeAxis = '';
-  for (let h = START_H; h < END_H; h++) {
-    timeAxis += `<div style="position:absolute;top:${(h-START_H)*HOUR_H - 7}px;font-size:10px;color:var(--gray-500);text-align:right;width:100%;padding-right:4px;line-height:1">${h}:00</div>`;
-  }
-
-  // Build each day column
-  const dayCols = days.map((dayName, d) => {
-    const items = dayItems[d] ? assignColumns(dayItems[d]) : [];
-
-    // Hour grid lines
-    let bgLines = '';
-    for (let h = START_H; h < END_H; h++) {
-      bgLines += `<div style="position:absolute;top:${(h-START_H)*HOUR_H}px;width:100%;border-top:1px solid var(--gray-200);pointer-events:none"></div>`;
-    }
-
-    // Course blocks — side by side when overlapping
-    const blocks = items.map(item => {
-      const c = item.course;
-      const top = (item.start - START_H) * HOUR_H;
-      const height = Math.max((item.end - item.start) * HOUR_H - 3, 22);
-      const leftPct = (item.col / item.maxCols) * 100;
-      const widthPct = (1 / item.maxCols) * 100;
-      return `<div
-        onclick="openEditCourse(${c.id})"
-        title="${c.name}&#10;${c.time}&#10;(กดเพื่อแก้ไข)"
-        style="position:absolute;top:${top}px;height:${height}px;
-          left:calc(${leftPct}% + 1px);width:calc(${widthPct}% - 2px);
-          background:${c.color}28;border:2px solid ${c.color};border-radius:6px;
-          padding:3px 4px;font-size:10px;font-weight:700;color:${c.color};
-          cursor:pointer;overflow:hidden;line-height:1.3;box-sizing:border-box;
-          transition:filter 0.15s"
-        onmouseover="this.style.filter='brightness(0.9)'"
-        onmouseout="this.style.filter=''"
-      >${c.name}${height > 28 ? `<br><span style="font-weight:400;font-size:9px">${c.time}</span>` : ''}</div>`;
-    }).join('');
-
-    return `
-      <div style="flex:1;min-width:65px">
-        <div style="text-align:center;padding:7px 2px;border-radius:4px;font-size:12px;font-weight:700;
-          color:#fff;background:${d===today?'var(--primary-dark)':'var(--primary)'};margin-bottom:3px">${dayName}</div>
-        <div style="position:relative;height:${TOTAL_H}px;background:#fafbfc;border-radius:4px;overflow:visible">
-          ${bgLines}${blocks}
-        </div>
-      </div>`;
-  }).join('');
+  const days = ['จ','อ','พ','พฤ','ศ','ส','อา'];
+  const times = ['08:00','09:00','10:00','11:00','12:00','13:00','14:00','15:00','16:00','17:00','18:00','19:00','20:00'];
+  const dayMap = {'จ':0,'อ':1,'พ':2,'พฤ':3,'ศ':4,'ส':5,'อา':6};
 
   el.innerHTML = `
-    <div class="card">
+    <div class="card" style="overflow-x:auto">
       <div class="card-header">
         <span class="card-title">ตารางเรียนประจำสัปดาห์</span>
-        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-          <span style="font-size:12px;color:var(--gray-500)">💡 กดที่คาบเรียนเพื่อแก้ไข</span>
-          <button class="btn btn-primary btn-sm owner-only" onclick="openAddCourse()">+ เพิ่มคาบเรียน</button>
-        </div>
       </div>
-      <div style="overflow-x:auto">
-        <div style="display:flex;gap:3px;min-width:520px">
-          <div style="width:36px;flex-shrink:0;padding-top:34px">
-            <div style="position:relative;height:${TOTAL_H}px">${timeAxis}</div>
-          </div>
-          ${dayCols}
-        </div>
-      </div>
-    </div>
-
-    <div class="card" style="margin-top:20px">
-      <div class="card-header"><span class="card-title">คลาสทั้งหมด</span></div>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>คอร์ส</th><th>อาจารย์</th><th>วันเรียน</th><th>เวลา</th><th>นักเรียน</th><th>จัดการ</th></tr></thead>
-          <tbody>
-            ${DB.courses.map(c=>`
-              <tr>
-                <td><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${c.color};margin-right:6px"></span><strong>${c.name}</strong></td>
-                <td>${c.teacher}</td>
-                <td>${c.day}</td>
-                <td>${c.time}</td>
-                <td>${DB.students.filter(s=>s.courses.includes(c.name)).length} คน</td>
-                <td style="white-space:nowrap">
-                  <button class="btn btn-icon btn-sm owner-only" title="แก้ไข" onclick="openEditCourse(${c.id})">✏️</button>
-                  <button class="btn btn-icon btn-sm owner-only" title="ลบ" onclick="deleteCourse(${c.id})" style="color:var(--danger)">🗑️</button>
-                </td>
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
+      <div class="schedule-grid" style="min-width:600px">
+        <div class="sch-header" style="background:var(--gray-200);color:var(--gray-700)">เวลา</div>
+        ${days.map(d=>`<div class="sch-header">${d}</div>`).join('')}
+        ${times.map(t=>`
+          <div class="sch-time">${t}</div>
+          ${days.map((_,di)=>{
+            const event = DB.courses.find(c=>{
+              const cdays = c.day.split('-').map(d=>d.trim());
+              const [sh,sm] = (c.time.split('-')[0]||'00:00').split(':').map(Number);
+              const th = Number(t.split(':')[0]);
+              return cdays.some(d=>dayMap[d]===di) && th===sh;
+            });
+            return `<div class="sch-cell">${event?`<div class="sch-event" style="background:${event.color}22;color:${event.color};border-left:3px solid ${event.color}" onclick="openCourseStudents(${event.id})">${event.name}<br><small>${event.teacher}</small></div>`:''}</div>`;
+          }).join('')}
+        `).join('')}
       </div>
     </div>
   `;
@@ -1859,944 +1809,263 @@ function renderSchedule(el) {
 // ============================================================
 // ATTENDANCE
 // ============================================================
+let attendState = {};
+
 function renderAttendance(el) {
   const today = new Date().toISOString().split('T')[0];
   el.innerHTML = `
-    <div class="card" style="margin-bottom:20px">
-      <div class="card-title" style="margin-bottom:16px">เลือกคาบที่ต้องการเช็คชื่อ</div>
-      <div class="form-row">
-        <div class="form-group">
-          <label>คอร์ส</label>
-          <select id="att_course" onchange="loadAttendance()">
-            ${DB.courses.map(c=>`<option>${c.name}</option>`).join('')}
-          </select>
-        </div>
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-header">
+        <span class="card-title">เช็คชื่อ</span>
+      </div>
+      <div class="form-row" style="margin-bottom:16px">
         <div class="form-group">
           <label>วันที่</label>
           <input type="date" id="att_date" value="${today}" onchange="loadAttendance()">
         </div>
+        <div class="form-group">
+          <label>คอร์ส</label>
+          <select id="att_course" onchange="loadAttendance()">
+            <option value="">-- เลือกคอร์ส --</option>
+            ${[...DB.courses].sort((a,b)=>courseSort(a.name,b.name)).map(c=>`<option value="${c.name}">${c.name}</option>`).join('')}
+          </select>
+        </div>
       </div>
+      <div id="attendList"></div>
     </div>
-    <div class="card" id="att_list">
-      <div class="empty"><div class="empty-icon">✅</div>เลือกคอร์สและวันที่เพื่อเช็คชื่อ</div>
+    <div class="card" id="attendSummaryCard" style="display:none">
+      <div class="card-header"><span class="card-title">สรุปการเช็คชื่อวันนี้</span></div>
+      <div id="attendSummary"></div>
     </div>
   `;
-  loadAttendance();
+  loadAttendSummary();
 }
 
 function loadAttendance() {
-  const course = document.getElementById('att_course')?.value;
-  const date = document.getElementById('att_date')?.value;
-  if(!course || !date) return;
-  const students = DB.students.filter(s=>s.courses.includes(course) && s.status==='active');
-  const key = `${course}_${date}`;
-  if(!attendanceState[key]) attendanceState[key] = {};
+  const date = document.getElementById('att_date').value;
+  const course = document.getElementById('att_course').value;
+  const listEl = document.getElementById('attendList');
+  attendState = {};
+  if (!course) { listEl.innerHTML = '<div class="empty">กรุณาเลือกคอร์ส</div>'; return; }
 
-  // Pre-fill state from saved DB.attendance records for this day
-  const savedRecords = (DB.attendance||[]).filter(a=>a.course===course && a.date===date);
-  savedRecords.forEach(a=>{
-    const stu = DB.students.find(s=>s.name===a.student);
-    if(stu && attendanceState[key][stu.id] === undefined) attendanceState[key][stu.id] = a.status;
+  const students = DB.students.filter(s=>s.status==='active' && s.courses.includes(course));
+  if (!students.length) { listEl.innerHTML = '<div class="empty">ไม่มีนักเรียนในคอร์สนี้</div>'; return; }
+
+  // Pre-fill from existing attendance records (no auto-select — show existing saves only)
+  students.forEach(s => {
+    const rec = (DB.attendance||[]).find(a=>a.student===s.name && a.course===course && a.date===date);
+    if (rec) attendState[s.id] = rec.status;
+    else attendState[s.id] = null;
   });
 
-  if (students.length === 0) {
-    document.getElementById('att_list').innerHTML = '<div class="empty"><div class="empty-icon">🎓</div>ไม่มีนักเรียนในคอร์สนี้</div>';
-    return;
-  }
+  renderAttendList(students, course, date);
+}
 
-  // Build daily summary from DB.attendance
-  const daySummary = { present:0, absent:0, leave:0 };
-  savedRecords.forEach(a=>{ if(daySummary[a.status]!==undefined) daySummary[a.status]++; });
-
-  document.getElementById('att_list').innerHTML =
-    `<div class="card-header"><span class="card-title">เช็คชื่อ: ${course} (${date})</span>
-       <button class="btn btn-primary btn-sm" onclick="saveAttendance('${key}','${course}','${date}')">💾 บันทึก</button>
+function renderAttendList(students, course, date) {
+  const listEl = document.getElementById('attendList');
+  listEl.innerHTML = `
+    <div style="margin-bottom:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <span style="font-size:13px;color:var(--gray-500)">เลือกทั้งหมด:</span>
+      <button class="btn btn-sm" style="background:#E8F5E9;color:#2E7D32;border:none" onclick="setAllAttend('present','${course}','${date}')">✅ มาทั้งหมด</button>
+      <button class="btn btn-sm" style="background:#FFEBEE;color:#B71C1C;border:none" onclick="setAllAttend('absent','${course}','${date}')">❌ ขาดทั้งหมด</button>
     </div>
-    ${students.map(s=>{
-      const st = attendanceState[key][s.id] || '';
-      // Count history for this student in this course
-      const hist = (DB.attendance||[]).filter(a=>a.student===s.name && a.course===course);
-      const hPresent = hist.filter(a=>a.status==='present').length;
-      const hAbsent = hist.filter(a=>a.status==='absent').length;
-      const hLeave = hist.filter(a=>a.status==='leave').length;
-      return `<div class="attend-student">
-        <div class="attend-avatar" style="cursor:pointer" onclick="showAttendanceHistory('${s.name.replace(/'/g,"\\'")}','${course}')">${s.nickname[0]}</div>
-        <div class="attend-name" style="cursor:pointer;text-decoration:underline dotted" onclick="showAttendanceHistory('${s.name.replace(/'/g,"\\'")}','${course}')" title="ดูประวัติการเข้าเรียน">
-          ${s.name}
-          <span style="font-size:11px;color:var(--gray-500);font-weight:400;text-decoration:none;display:block">มา ${hPresent} | ขาด ${hAbsent} | ลา ${hLeave} ครั้ง</span>
-        </div>
+    ${students.map(s=>`
+      <div class="attend-student" id="ats_${s.id}">
+        <div class="attend-avatar" style="cursor:pointer" onclick="openStudentDetail(${s.id})">${s.nickname[0]}</div>
+        <div class="attend-name" style="cursor:pointer" onclick="openStudentDetail(${s.id})">${s.name} <span style="font-size:11px;color:var(--gray-500)">(${s.nickname})</span></div>
         <div class="attend-status">
-          <button class="status-btn ${st==='present'?'present':''}" onclick="setStatus('${key}',${s.id},'present',this)">✅ มา</button>
-          <button class="status-btn ${st==='absent'?'absent':''}" onclick="setStatus('${key}',${s.id},'absent',this)">❌ ขาด</button>
-          <button class="status-btn ${st==='leave'?'leave':''}" onclick="setStatus('${key}',${s.id},'leave',this)">📋 ลา</button>
+          <button class="status-btn ${attendState[s.id]==='present'?'present':''}" onclick="setAttend(${s.id},'present','${course}','${date}')">✅ มา</button>
+          <button class="status-btn ${attendState[s.id]==='absent'?'absent':''}" onclick="setAttend(${s.id},'absent','${course}','${date}')">❌ ขาด</button>
+          <button class="status-btn ${attendState[s.id]==='leave'?'leave':''}" onclick="setAttend(${s.id},'leave','${course}','${date}')">📋 ลา</button>
         </div>
-      </div>`;
-    }).join('')}
-    ${savedRecords.length > 0 ? `
-    <div style="margin-top:16px;padding:12px 16px;background:var(--gray-100);border-radius:10px;display:flex;gap:24px;align-items:center;flex-wrap:wrap">
-      <span style="font-size:12px;font-weight:700;color:var(--gray-700)">สรุปวันที่ ${date}</span>
-      <span style="font-size:13px;color:var(--success);font-weight:700">✅ มา ${daySummary.present} คน</span>
-      <span style="font-size:13px;color:var(--danger);font-weight:700">❌ ขาด ${daySummary.absent} คน</span>
-      <span style="font-size:13px;color:var(--warning);font-weight:700">📋 ลา ${daySummary.leave} คน</span>
-      <span style="font-size:12px;color:var(--gray-500)">รวม ${savedRecords.length} คน</span>
-    </div>` : ''}`;
-}
-
-function showAttendanceHistory(studentName, courseName) {
-  const records = (DB.attendance||[])
-    .filter(a => a.student === studentName && a.course === courseName)
-    .sort((a,b) => b.date.localeCompare(a.date));
-
-  const statusLabel = { present:'<span style="color:var(--success);font-weight:700">✅ มา</span>', absent:'<span style="color:var(--danger);font-weight:700">❌ ขาด</span>', leave:'<span style="color:var(--warning);font-weight:700">📋 ลา</span>' };
-  const total = { present: records.filter(r=>r.status==='present').length, absent: records.filter(r=>r.status==='absent').length, leave: records.filter(r=>r.status==='leave').length };
-
-  const rows = records.length === 0
-    ? '<tr><td colspan="2" class="empty">ยังไม่มีบันทึก</td></tr>'
-    : records.map(r=>`<tr><td>${r.date}</td><td>${statusLabel[r.status]||r.status}</td></tr>`).join('');
-
-  openModal(`ประวัติการเข้าเรียน — ${studentName}`,
-    `<div style="font-size:13px;font-weight:600;color:var(--gray-700);margin-bottom:12px">คอร์ส: ${courseName}</div>
-    <div style="display:flex;gap:16px;margin-bottom:16px;flex-wrap:wrap">
-      <div style="background:#E8F5E9;border-radius:8px;padding:10px 18px;text-align:center">
-        <div style="font-size:22px;font-weight:800;color:var(--success)">${total.present}</div>
-        <div style="font-size:11px;color:var(--gray-700)">มา</div>
       </div>
-      <div style="background:#FFEBEE;border-radius:8px;padding:10px 18px;text-align:center">
-        <div style="font-size:22px;font-weight:800;color:var(--danger)">${total.absent}</div>
-        <div style="font-size:11px;color:var(--gray-700)">ขาด</div>
-      </div>
-      <div style="background:#FFF8E1;border-radius:8px;padding:10px 18px;text-align:center">
-        <div style="font-size:22px;font-weight:800;color:var(--warning)">${total.leave}</div>
-        <div style="font-size:11px;color:var(--gray-700)">ลา</div>
-      </div>
-      <div style="background:var(--gray-100);border-radius:8px;padding:10px 18px;text-align:center">
-        <div style="font-size:22px;font-weight:800;color:var(--gray-700)">${records.length > 0 ? Math.round(total.present/records.length*100) : 0}%</div>
-        <div style="font-size:11px;color:var(--gray-700)">อัตราเข้าเรียน</div>
-      </div>
+    `).join('')}
+    <div style="margin-top:16px;display:flex;gap:10px;align-items:center">
+      <button class="btn btn-primary" onclick="saveAttendance('${course}','${date}')">💾 บันทึกการเช็คชื่อ</button>
+      <span id="saveStatus" style="font-size:13px;color:var(--gray-500)"></span>
     </div>
-    <div class="table-wrap" style="max-height:300px;overflow-y:auto">
-      <table>
-        <thead><tr><th>วันที่</th><th>สถานะ</th></tr></thead>
-        <tbody>${rows}</tbody>
-      </table>
-    </div>`,
-    `<button class="btn btn-outline" onclick="closeModal()">ปิด</button>`
-  );
+  `;
 }
 
-function setStatus(key, sid, status, btn) {
-  if(!attendanceState[key]) attendanceState[key]={};
-  const current = attendanceState[key][sid];
-  const row = btn.closest('.attend-student');
-  row.querySelectorAll('.status-btn').forEach(b=>{b.className='status-btn';});
-  // กดซ้ำปุ่มเดิม = ยกเลิกการเลือก
-  if (current === status) {
-    attendanceState[key][sid] = '';
-  } else {
-    attendanceState[key][sid] = status;
-    btn.classList.add(status);
+function setAttend(sid, status, course, date) {
+  attendState[sid] = attendState[sid] === status ? null : status;
+  const row = document.getElementById('ats_'+sid);
+  if (row) {
+    row.querySelectorAll('.status-btn').forEach(b=>b.className='status-btn');
+    if (attendState[sid]) {
+      const map = {present:0,absent:1,leave:2};
+      const idx = map[attendState[sid]];
+      if (idx !== undefined) row.querySelectorAll('.status-btn')[idx].classList.add(attendState[sid]);
+    }
   }
 }
 
-function saveAttendance(key, course, date) {
-  const state = attendanceState[key] || {};
-  const hasAny = Object.keys(state).some(sid => !!state[sid]);
-  if (!hasAny) { showToast('กรุณาเลือกสถานะนักเรียนอย่างน้อย 1 คน', 'warning'); return; }
+function setAllAttend(status, course, date) {
+  const students = DB.students.filter(s=>s.status==='active' && s.courses.includes(course));
+  students.forEach(s => { attendState[s.id] = status; });
+  renderAttendList(students, course, date);
+}
 
-  if (!DB.attendance) DB.attendance = [];
+function saveAttendance(course, date) {
+  const students = DB.students.filter(s=>s.status==='active' && s.courses.includes(course));
   let deducted = 0;
-  Object.keys(state).forEach(sid => {
-    const student = DB.students.find(s => s.id === Number(sid));
-    if (!student) return;
+  students.forEach(student => {
+    const sid = student.id;
+    // Capture existing record BEFORE removing it
+    const oldRecord = (DB.attendance||[]).find(a => a.student === student.name && a.course === course && a.date === date);
+    const wasDeducted = oldRecord?.status === 'present' || oldRecord?.status === 'absent';
+    const nowDeducted = attendState[sid] === 'present' || attendState[sid] === 'absent';
+    const enr = (DB.enrollments||[]).find(e => e.studentName === student.name && e.courseName === course && e.status === 'active');
+    if (enr) {
+      if (nowDeducted && !wasDeducted) { enr.usedHours = (enr.usedHours||0) + 2; deducted++; }
+      else if (!nowDeducted && wasDeducted) { enr.usedHours = Math.max(0, (enr.usedHours||0) - 2); }
+    }
     // Remove old record for this student+course+date
     DB.attendance = DB.attendance.filter(a => !(a.student === student.name && a.course === course && a.date === date));
-    if (!state[sid]) return; // ยกเลิกการเลือก → ลบ record ออก ไม่บันทึกใหม่
-    const newId = DB.attendance.length > 0 ? Math.max(...DB.attendance.map(a=>a.id)) + 1 : 1;
-    DB.attendance.push({ id: newId, student: student.name, course, date, status: state[sid] });
-    if (state[sid] === 'present') {
-      const enr = (DB.enrollments||[]).find(e =>
-        e.studentName === student.name && e.courseName === course && e.status === 'active'
-      );
-      if (enr) { enr.usedHours = (enr.usedHours||0) + 2; deducted++; }
+    if (!attendState[sid]) {
+      if (wasDeducted) {
+        const enr2 = (DB.enrollments||[]).find(e => e.studentName === student.name && e.courseName === course && e.status === 'active');
+        if (enr2) enr2.usedHours = Math.max(0, (enr2.usedHours||0) - 2);
+      }
+      return;
     }
+    const maxId = Math.max(...(DB.attendance||[]).map(a=>a.id||0), 0);
+    DB.attendance.push({ id: maxId+1, student: student.name, course, date, status: attendState[sid] });
   });
   saveDB();
-  showToast(`บันทึกการเข้าเรียน ${course} สำเร็จ${deducted>0?' (หักชั่วโมง '+deducted+' คน)':''}`);
-  loadAttendance(); // refresh summary + history counts
+  const statusEl = document.getElementById('saveStatus');
+  if (statusEl) statusEl.textContent = `บันทึกแล้ว${deducted?' (หักชั่วโมงเรียน '+deducted+' คน)':''}`;
+  showToast('บันทึกการเช็คชื่อสำเร็จ ✅');
+  loadAttendSummary();
 }
 
-// ============================================================
-// MAKEUP CLASSES
-// ============================================================
-function renderMakeup(el) {
-  el.innerHTML = `
-    <div style="display:flex;justify-content:flex-end;margin-bottom:16px">
-      <button class="btn btn-primary" onclick="openAddMakeup()">+ สร้างคำขอชดเชย</button>
-    </div>
-    <div class="card">
-      <div class="search-bar" style="margin-bottom:16px">
-        <div class="search-input-wrap"><span class="search-icon">🔍</span><input placeholder="ค้นหา..." oninput="filterMakeup(this.value)"></div>
-      </div>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>นักเรียน</th><th>คอร์ส</th><th>จากตาราง</th><th>เป็นตาราง</th><th>สถานะ</th><th>สร้างเมื่อ</th><th>จัดการ</th></tr></thead>
-          <tbody id="makeupBody">${DB.makeup.map(makeupRow).join('')}</tbody>
-        </table>
-      </div>
-    </div>
-  `;
-}
-
-function makeupRow(m) {
-  return `<tr>
-    <td><strong>${m.student}</strong></td>
-    <td>${m.course}</td>
-    <td>${m.from}</td>
-    <td>${m.to}</td>
-    <td>${m.status==='approved'?'<span class="badge badge-success">อนุมัติแล้ว</span>':'<span class="badge badge-warning">รอดำเนินการ</span>'}</td>
-    <td>${m.created}</td>
-    <td style="white-space:nowrap">
-      ${m.status==='pending'?`<button class="btn btn-primary btn-sm" onclick="approveMakeup(${m.id})">อนุมัติ</button> `:''}
-      <button class="btn btn-icon btn-sm" title="แก้ไข" onclick="openEditMakeup(${m.id})">✏️</button>
-      <button class="btn btn-icon btn-sm" title="ลบ" onclick="deleteMakeup(${m.id})" style="color:var(--danger)">🗑️</button>
-    </td>
-  </tr>`;
-}
-
-function filterMakeup(q) {
-  const rows = DB.makeup.filter(m=>m.student.includes(q)||m.course.includes(q)).map(makeupRow).join('');
-  document.getElementById('makeupBody').innerHTML = rows || '<tr><td colspan="7" class="empty">ไม่พบ</td></tr>';
-}
-
-function approveMakeup(id) {
-  const m = DB.makeup.find(x=>x.id===id);
-  m.status = 'approved';
-  saveDB();
-  renderMakeup(document.getElementById('mainContent'));
-  showToast('อนุมัติการชดเชยสำเร็จ');
-}
-
-function openEditMakeup(id) {
-  const m = DB.makeup.find(x=>x.id===id);
-  openModal('แก้ไขคำขอเรียนชดเชย', `
-    <div class="form-group">
-      <label>นักเรียน</label>
-      <select id="em_student">${DB.students.filter(s=>s.status==='active').map(s=>`<option ${s.name===m.student?'selected':''}>${s.name}</option>`).join('')}</select>
-    </div>
-    <div class="form-group">
-      <label>คอร์ส</label>
-      <select id="em_course">${DB.courses.map(c=>`<option ${c.name===m.course?'selected':''}>${c.name}</option>`).join('')}</select>
-    </div>
-    <div class="form-row">
-      <div class="form-group"><label>วันที่ขาด</label><input id="em_from" value="${m.from}"></div>
-      <div class="form-group"><label>วันที่ชดเชย</label><input id="em_to" value="${m.to}"></div>
-    </div>
-    <div class="form-group">
-      <label>สถานะ</label>
-      <select id="em_status">
-        <option value="pending" ${m.status==='pending'?'selected':''}>รอดำเนินการ</option>
-        <option value="approved" ${m.status==='approved'?'selected':''}>อนุมัติแล้ว</option>
-      </select>
-    </div>
-  `,`
-    <button class="btn btn-outline" onclick="closeModal()">ยกเลิก</button>
-    <button class="btn btn-primary" onclick="updateMakeup(${id})">บันทึก</button>
-  `);
-}
-
-function updateMakeup(id) {
-  const m = DB.makeup.find(x=>x.id===id);
-  m.student = document.getElementById('em_student').value;
-  m.course = document.getElementById('em_course').value;
-  m.from = document.getElementById('em_from').value;
-  m.to = document.getElementById('em_to').value;
-  m.status = document.getElementById('em_status').value;
-  saveDB();
-  closeModal();
-  renderMakeup(document.getElementById('mainContent'));
-  showToast('บันทึกสำเร็จ');
-}
-
-function deleteMakeup(id) {
-  if(!confirm('ลบคำขอเรียนชดเชยนี้?')) return;
-  DB.makeup = DB.makeup.filter(x=>x.id!==id);
-  saveDB();
-  renderMakeup(document.getElementById('mainContent'));
-  showToast('ลบสำเร็จ');
-}
-
-function openAddMakeup() {
-  openModal('สร้างคำขอเรียนชดเชย', `
-    <div class="form-group">
-      <label>นักเรียน</label>
-      <select id="mk_student">${DB.students.filter(s=>s.status==='active').map(s=>`<option>${s.name}</option>`).join('')}</select>
-    </div>
-    <div class="form-group">
-      <label>คอร์ส</label>
-      <select id="mk_course">${DB.courses.map(c=>`<option>${c.name}</option>`).join('')}</select>
-    </div>
-    <div class="form-row">
-      <div class="form-group"><label>วันที่ขาด</label><input type="date" id="mk_from"></div>
-      <div class="form-group"><label>วันที่ชดเชย</label><input type="date" id="mk_to"></div>
-    </div>
-  `,`
-    <button class="btn btn-outline" onclick="closeModal()">ยกเลิก</button>
-    <button class="btn btn-primary" onclick="saveMakeup()">ส่งคำขอ</button>
-  `);
-}
-
-function saveMakeup() {
-  DB.makeup.push({
-    id: DB.makeup.length+1,
-    student: document.getElementById('mk_student').value,
-    course: document.getElementById('mk_course').value,
-    from: document.getElementById('mk_from').value,
-    to: document.getElementById('mk_to').value,
-    status:'pending',
-    created: new Date().toLocaleDateString('th-TH')
-  });
-  saveDB();
-  closeModal();
-  renderMakeup(document.getElementById('mainContent'));
-  showToast('ส่งคำขอชดเชยสำเร็จ');
-}
-
-// ============================================================
-// PROGRESS
-// ============================================================
-function renderProgress(el) {
-  const enrollments = (DB.enrollments||[]).filter(e=>e.status==='active');
+function loadAttendSummary() {
   const today = new Date().toISOString().split('T')[0];
-
-  if (!enrollments.length) {
-    el.innerHTML = `<div class="card"><div class="empty"><div class="empty-icon">📈</div>ยังไม่มีข้อมูลการลงทะเบียน<br><button class="btn btn-primary" style="margin-top:12px" onclick="showPage('enrollment',null)">ไปหน้าลงทะเบียน</button></div></div>`;
-    return;
-  }
-
-  // Group by student
-  const byStudent = {};
-  enrollments.forEach(e => {
-    if (!byStudent[e.studentName]) byStudent[e.studentName] = [];
-    byStudent[e.studentName].push(e);
+  const todayRecs = (DB.attendance||[]).filter(a=>a.date===today);
+  const summaryCard = document.getElementById('attendSummaryCard');
+  if (!summaryCard) return;
+  if (!todayRecs.length) { summaryCard.style.display='none'; return; }
+  summaryCard.style.display='block';
+  const byCourse = {};
+  todayRecs.forEach(a => {
+    if (!byCourse[a.course]) byCourse[a.course] = {present:0,absent:0,leave:0,names:[]};
+    byCourse[a.course][a.status] = (byCourse[a.course][a.status]||0)+1;
+    byCourse[a.course].names.push({name:a.student,status:a.status});
   });
-
-  el.innerHTML = `
-    <div class="card">
-      <div class="card-header">
-        <span class="card-title">ความก้าวหน้านักเรียน</span>
-        <span style="font-size:12px;color:var(--gray-500)">(จากข้อมูลชั่วโมงเรียนจริง)</span>
+  document.getElementById('attendSummary').innerHTML = Object.entries(byCourse).map(([course,data])=>`
+    <div style="margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid var(--gray-200)">
+      <div style="font-weight:700;margin-bottom:8px">${course}</div>
+      <div style="display:flex;gap:16px;margin-bottom:8px">
+        <span style="color:var(--success)">✅ มา ${data.present} คน</span>
+        <span style="color:var(--danger)">❌ ขาด ${data.absent} คน</span>
+        <span style="color:var(--warning)">📋 ลา ${data.leave} คน</span>
       </div>
-      ${Object.entries(byStudent).map(([studentName, enrs]) => {
-        const student = DB.students.find(s=>s.name===studentName);
-        const nick = student ? student.nickname : studentName.split(' ')[0];
-        return enrs.map(e => {
-          const isPending = e.startDate > today;
-          const pct = e.totalHours > 0 ? Math.min(Math.round((e.usedHours/e.totalHours)*100),100) : 0;
-          const color = pct>=70?'var(--success)':pct>=40?'var(--warning)':'var(--danger)';
-          const remaining = e.totalHours - e.usedHours;
-          return `<div style="padding:14px 0;border-bottom:1px solid var(--gray-200)">
-            <div style="display:flex;justify-content:space-between;margin-bottom:8px;align-items:center;flex-wrap:wrap;gap:8px">
-              <div style="display:flex;align-items:center;gap:10px">
-                <div class="attend-avatar">${nick[0]}</div>
-                <div>
-                  <div style="font-weight:700">${studentName}</div>
-                  <div style="font-size:12px;color:var(--gray-500)">${e.courseName}
-                    <span class="badge ${e.paymentType==='monthly'?'badge-info':'badge-success'}" style="font-size:10px;margin-left:4px">${e.paymentType==='monthly'?'รายเดือน':'รายคอร์ส'}</span>
-                    ${isPending?`<span class="badge badge-warning" style="font-size:10px;margin-left:4px">⏳ รอเริ่ม ${e.startDate}</span>`:''}
-                  </div>
-                </div>
-              </div>
-              <div style="text-align:right">
-                <div style="font-weight:800;color:${color}">${isPending?'—':pct+'%'}</div>
-                <div style="font-size:12px;color:var(--gray-500)">${isPending?`เริ่ม ${e.startDate}`:`เรียนไป ${e.usedHours}/${e.totalHours} ชม. (เหลือ ${remaining})`}</div>
-              </div>
-            </div>
-            ${!isPending?`<div class="progress"><div class="progress-bar" style="width:${pct}%;background:${color}"></div></div>`:'<div style="background:var(--gray-200);height:8px;border-radius:20px"></div>'}
-          </div>`;
-        }).join('');
-      }).join('')}
     </div>
-  `;
+  `).join('');
 }
 
 // ============================================================
-// FINANCE
-// ============================================================
-function renderFinance(el) {
-  const total = DB.invoices.reduce((a,b)=>a+(b.status==='paid'?b.amount:0),0);
-  const pending = DB.invoices.filter(i=>i.status!=='paid').reduce((a,b)=>a+b.amount,0);
-
-  el.innerHTML = `
-    <div class="stat-cards" style="margin-bottom:20px">
-      <div class="stat-card">
-        <div class="stat-icon green">💵</div>
-        <div><div class="stat-num">฿${total.toLocaleString()}</div><div class="stat-label">รับชำระแล้ว</div></div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-icon red">⏳</div>
-        <div><div class="stat-num">฿${pending.toLocaleString()}</div><div class="stat-label">ค้างชำระ</div></div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-icon orange">📄</div>
-        <div><div class="stat-num">${DB.invoices.length}</div><div class="stat-label">ใบแจ้งหนี้ทั้งหมด</div></div>
-      </div>
-    </div>
-    <div class="card">
-      <div class="card-header">
-        <span class="card-title">ใบแจ้งหนี้ทั้งหมด</span>
-        <div style="display:flex;gap:8px">
-          <select class="month-select" id="fin_month">
-            <option>มิถุนายน 2569</option><option>พฤษภาคม 2569</option><option>เมษายน 2569</option>
-          </select>
-          <button class="btn btn-primary btn-sm" onclick="openAddInvoice()">+ สร้างใบแจ้งหนี้</button>
-        </div>
-      </div>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>นักเรียน</th><th>คอร์ส</th><th>เดือน</th><th>ครบกำหนด</th><th>จำนวน</th><th>สถานะ</th><th>จัดการ</th></tr></thead>
-          <tbody>
-            ${DB.invoices.map(i=>`
-              <tr>
-                <td><strong>${i.student}</strong></td>
-                <td>${i.course}</td>
-                <td>${i.month}</td>
-                <td>${i.due}</td>
-                <td style="font-weight:700">฿${i.amount.toLocaleString()}</td>
-                <td>${statusBadge(i.status)}</td>
-                <td style="white-space:nowrap">
-                  ${i.status!=='paid'?`<button class="btn btn-sm btn-primary" onclick="markPaid(${i.id})">รับชำระ</button> `:''}
-                  <button class="btn btn-icon btn-sm" title="แก้ไข" onclick="openEditInvoice(${i.id})">✏️</button>
-                  <button class="btn btn-icon btn-sm" title="ลบ" onclick="deleteInvoice(${i.id})" style="color:var(--danger)">🗑️</button>
-                </td>
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  `;
-}
-
-function statusBadge(status) {
-  const m = { paid:'<span class="badge badge-success">ชำระแล้ว</span>', unpaid:'<span class="badge badge-warning">ยังไม่ชำระ</span>', overdue:'<span class="badge badge-danger">เกินกำหนด</span>', active:'<span class="badge badge-success">กำลังเรียน</span>', inactive:'<span class="badge badge-gray">ลาออก</span>' };
-  return m[status] || `<span class="badge badge-gray">${status}</span>`;
-}
-
-function markPaid(id) {
-  DB.invoices.find(i=>i.id===id).status = 'paid';
-  saveDB();
-  renderFinance(document.getElementById('mainContent'));
-  showToast('บันทึกการรับชำระสำเร็จ');
-}
-
-function openEditInvoice(id) {
-  const i = DB.invoices.find(x=>x.id===id);
-  openModal('แก้ไขใบแจ้งหนี้', `
-    <div class="form-group">
-      <label>นักเรียน</label>
-      <select id="ei_student">${DB.students.map(s=>`<option ${s.name===i.student?'selected':''}>${s.name}</option>`).join('')}</select>
-    </div>
-    <div class="form-group">
-      <label>คอร์ส</label>
-      <select id="ei_course">${DB.courses.map(c=>`<option ${c.name===i.course?'selected':''}>${c.name}</option>`).join('')}</select>
-    </div>
-    <div class="form-row">
-      <div class="form-group"><label>เดือน</label><input id="ei_month" value="${i.month}"></div>
-      <div class="form-group"><label>ครบกำหนด</label><input type="date" id="ei_due" value="${i.due}"></div>
-    </div>
-    <div class="form-row">
-      <div class="form-group"><label>จำนวนเงิน (บาท)</label><input id="ei_amt" type="number" value="${i.amount}"></div>
-      <div class="form-group">
-        <label>สถานะ</label>
-        <select id="ei_status">
-          <option value="unpaid" ${i.status==='unpaid'?'selected':''}>ยังไม่ชำระ</option>
-          <option value="paid" ${i.status==='paid'?'selected':''}>ชำระแล้ว</option>
-          <option value="overdue" ${i.status==='overdue'?'selected':''}>เกินกำหนด</option>
-        </select>
-      </div>
-    </div>
-  `,`
-    <button class="btn btn-outline" onclick="closeModal()">ยกเลิก</button>
-    <button class="btn btn-primary" onclick="updateInvoice(${id})">บันทึก</button>
-  `);
-}
-
-function updateInvoice(id) {
-  const i = DB.invoices.find(x=>x.id===id);
-  i.student = document.getElementById('ei_student').value;
-  i.course = document.getElementById('ei_course').value;
-  i.month = document.getElementById('ei_month').value;
-  i.due = document.getElementById('ei_due').value;
-  i.amount = Number(document.getElementById('ei_amt').value)||0;
-  i.status = document.getElementById('ei_status').value;
-  saveDB();
-  closeModal();
-  renderFinance(document.getElementById('mainContent'));
-  showToast('บันทึกสำเร็จ');
-}
-
-function deleteInvoice(id) {
-  const i = DB.invoices.find(x=>x.id===id);
-  if(!confirm(`ลบใบแจ้งหนี้ของ ${i.student} (${i.course}) เดือน ${i.month}?`)) return;
-  DB.invoices = DB.invoices.filter(x=>x.id!==id);
-  saveDB();
-  renderFinance(document.getElementById('mainContent'));
-  showToast('ลบใบแจ้งหนี้สำเร็จ');
-}
-
-function openAddInvoice() {
-  openModal('สร้างใบแจ้งหนี้', `
-    <div class="form-group">
-      <label>นักเรียน</label>
-      <select id="inv_student">${DB.students.filter(s=>s.status==='active').map(s=>`<option>${s.name}</option>`).join('')}</select>
-    </div>
-    <div class="form-group">
-      <label>คอร์ส</label>
-      <select id="inv_course">${DB.courses.map(c=>`<option value="${c.name}" data-fee="${c.fee}">${c.name} (฿${c.fee.toLocaleString()})</option>`).join('')}</select>
-    </div>
-    <div class="form-row">
-      <div class="form-group"><label>เดือน</label><input id="inv_month" placeholder="มิถุนายน 2569"></div>
-      <div class="form-group"><label>ครบกำหนด</label><input type="date" id="inv_due"></div>
-    </div>
-    <div class="form-group"><label>จำนวนเงิน (บาท)</label><input id="inv_amt" type="number"></div>
-  `,`
-    <button class="btn btn-outline" onclick="closeModal()">ยกเลิก</button>
-    <button class="btn btn-primary" onclick="saveInvoice()">บันทึก</button>
-  `);
-}
-
-function saveInvoice() {
-  DB.invoices.push({
-    id: DB.invoices.length+1,
-    student: document.getElementById('inv_student').value,
-    course: document.getElementById('inv_course').value.split(' (')[0],
-    month: document.getElementById('inv_month').value,
-    due: document.getElementById('inv_due').value,
-    amount: Number(document.getElementById('inv_amt').value)||0,
-    status:'unpaid'
-  });
-  saveDB();
-  closeModal();
-  renderFinance(document.getElementById('mainContent'));
-  showToast('สร้างใบแจ้งหนี้สำเร็จ');
-}
-
-// ============================================================
-// SALARY
-// ============================================================
-function renderSalary(el) {
-  const records = DB.salary || [];
-  const total = records.reduce((a,b)=>a+(b.base+b.bonus),0);
-  const paid = records.filter(s=>s.paid).reduce((a,b)=>a+(b.base+b.bonus),0);
-  const pending = records.filter(s=>!s.paid).reduce((a,b)=>a+(b.base+b.bonus),0);
-  el.innerHTML = `
-    <div class="stat-cards" style="margin-bottom:20px">
-      <div class="stat-card">
-        <div class="stat-icon blue">💳</div>
-        <div><div class="stat-num">฿${total.toLocaleString()}</div><div class="stat-label">ค่าตอบแทนรวม/เดือน</div></div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-icon green">✅</div>
-        <div><div class="stat-num">฿${paid.toLocaleString()}</div><div class="stat-label">จ่ายแล้ว</div></div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-icon orange">⏳</div>
-        <div><div class="stat-num">฿${pending.toLocaleString()}</div><div class="stat-label">รอจ่าย</div></div>
-      </div>
-    </div>
-    <div class="card">
-      <div class="card-header">
-        <span class="card-title">ค่าตอบแทน Teachers</span>
-        <button class="btn btn-primary btn-sm" onclick="openAddSalary()">+ เพิ่มรายการ</button>
-      </div>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>อาจารย์</th><th>เดือน</th><th>เงินเดือน</th><th>โบนัส</th><th>รวม</th><th>สถานะ</th><th>จัดการ</th></tr></thead>
-          <tbody>
-            ${records.map(s=>`
-              <tr>
-                <td><strong>${s.teacher}</strong></td>
-                <td>${s.month}</td>
-                <td>฿${s.base.toLocaleString()}</td>
-                <td>${s.bonus>0?`<span style="color:var(--success)">+฿${s.bonus.toLocaleString()}</span>`:'—'}</td>
-                <td style="font-weight:800">฿${(s.base+s.bonus).toLocaleString()}</td>
-                <td>${s.paid?'<span class="badge badge-success">จ่ายแล้ว</span>':'<span class="badge badge-warning">รอจ่าย</span>'}</td>
-                <td style="white-space:nowrap">
-                  ${!s.paid?`<button class="btn btn-primary btn-sm" onclick="markSalaryPaid(${s.id})">จ่าย</button> `:''}
-                  <button class="btn btn-icon btn-sm" title="แก้ไข" onclick="openEditSalary(${s.id})">✏️</button>
-                  <button class="btn btn-icon btn-sm" title="ลบ" onclick="deleteSalary(${s.id})" style="color:var(--danger)">🗑️</button>
-                </td>
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  `;
-}
-
-function markSalaryPaid(id) {
-  DB.salary.find(s=>s.id===id).paid = true;
-  saveDB();
-  renderSalary(document.getElementById('mainContent'));
-  showToast('บันทึกการจ่ายสำเร็จ');
-}
-
-function openAddSalary() {
-  openModal('เพิ่มรายการค่าตอบแทน', `
-    <div class="form-group">
-      <label>อาจารย์</label>
-      <select id="sal_teacher">${DB.teachers.map(t=>`<option>${t.name}</option>`).join('')}</select>
-    </div>
-    <div class="form-group"><label>เดือน</label><input id="sal_month" placeholder="มิ.ย. 2569"></div>
-    <div class="form-row">
-      <div class="form-group"><label>เงินเดือน (บาท)</label><input id="sal_base" type="number" placeholder="20000"></div>
-      <div class="form-group"><label>โบนัส (บาท)</label><input id="sal_bonus" type="number" placeholder="0" value="0"></div>
-    </div>
-  `,`
-    <button class="btn btn-outline" onclick="closeModal()">ยกเลิก</button>
-    <button class="btn btn-primary" onclick="saveSalary()">บันทึก</button>
-  `);
-}
-
-function saveSalary() {
-  if(!DB.salary) DB.salary = [];
-  DB.salary.push({
-    id: Math.max(...DB.salary.map(s=>s.id), 0)+1,
-    teacher: document.getElementById('sal_teacher').value,
-    month: document.getElementById('sal_month').value,
-    base: Number(document.getElementById('sal_base').value)||0,
-    bonus: Number(document.getElementById('sal_bonus').value)||0,
-    paid: false
-  });
-  saveDB();
-  closeModal();
-  renderSalary(document.getElementById('mainContent'));
-  showToast('เพิ่มรายการสำเร็จ');
-}
-
-function openEditSalary(id) {
-  const s = DB.salary.find(x=>x.id===id);
-  openModal('แก้ไขค่าตอบแทน', `
-    <div class="form-group">
-      <label>อาจารย์</label>
-      <select id="es_teacher">${DB.teachers.map(t=>`<option ${t.name===s.teacher?'selected':''}>${t.name}</option>`).join('')}</select>
-    </div>
-    <div class="form-group"><label>เดือน</label><input id="es_month" value="${s.month}"></div>
-    <div class="form-row">
-      <div class="form-group"><label>เงินเดือน (บาท)</label><input id="es_base" type="number" value="${s.base}"></div>
-      <div class="form-group"><label>โบนัส (บาท)</label><input id="es_bonus" type="number" value="${s.bonus}"></div>
-    </div>
-    <div class="form-group">
-      <label>สถานะ</label>
-      <select id="es_paid">
-        <option value="0" ${!s.paid?'selected':''}>รอจ่าย</option>
-        <option value="1" ${s.paid?'selected':''}>จ่ายแล้ว</option>
-      </select>
-    </div>
-  `,`
-    <button class="btn btn-outline" onclick="closeModal()">ยกเลิก</button>
-    <button class="btn btn-primary" onclick="updateSalary(${id})">บันทึก</button>
-  `);
-}
-
-function updateSalary(id) {
-  const s = DB.salary.find(x=>x.id===id);
-  s.teacher = document.getElementById('es_teacher').value;
-  s.month = document.getElementById('es_month').value;
-  s.base = Number(document.getElementById('es_base').value)||0;
-  s.bonus = Number(document.getElementById('es_bonus').value)||0;
-  s.paid = document.getElementById('es_paid').value==='1';
-  saveDB();
-  closeModal();
-  renderSalary(document.getElementById('mainContent'));
-  showToast('บันทึกสำเร็จ');
-}
-
-function deleteSalary(id) {
-  const s = DB.salary.find(x=>x.id===id);
-  if(!confirm(`ลบรายการค่าตอบแทน ${s.teacher} เดือน ${s.month}?`)) return;
-  DB.salary = DB.salary.filter(x=>x.id!==id);
-  saveDB();
-  renderSalary(document.getElementById('mainContent'));
-  showToast('ลบสำเร็จ');
-}
-
-// ============================================================
-// HOLIDAYS
-// ============================================================
-function renderHolidays(el) {
-  el.innerHTML = `
-    <div style="display:flex;justify-content:flex-end;margin-bottom:16px">
-      <button class="btn btn-primary" onclick="openAddHoliday()">+ เพิ่มวันหยุด</button>
-    </div>
-    <div class="card">
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>วันหยุด</th><th>ตั้งแต่</th><th>ถึง</th><th>จำนวนวัน</th><th>จัดการ</th></tr></thead>
-          <tbody id="holidayBody">${DB.holidays.map(holidayRow).join('')}</tbody>
-        </table>
-      </div>
-    </div>
-  `;
-}
-
-function holidayRow(h) {
-  const days = Math.round((new Date(h.to)-new Date(h.from))/(1000*60*60*24))+1;
-  return `<tr>
-    <td><strong>${h.name}</strong></td>
-    <td>${h.from}</td>
-    <td>${h.to}</td>
-    <td><span class="badge badge-info">${days} วัน</span></td>
-    <td><button class="btn btn-icon btn-sm" onclick="deleteHoliday(${h.id})">🗑️</button></td>
-  </tr>`;
-}
-
-function deleteHoliday(id) {
-  if(!confirm('ลบวันหยุดนี้?')) return;
-  const i = DB.holidays.findIndex(h=>h.id===id);
-  DB.holidays.splice(i,1);
-  saveDB();
-  renderHolidays(document.getElementById('mainContent'));
-  showToast('ลบวันหยุดสำเร็จ');
-}
-
-function openAddHoliday() {
-  openModal('เพิ่มวันหยุด', `
-    <div class="form-group"><label>ชื่อวันหยุด</label><input id="h_name" placeholder="เช่น วันสงกรานต์"></div>
-    <div class="form-row">
-      <div class="form-group"><label>ตั้งแต่วันที่</label><input type="date" id="h_from"></div>
-      <div class="form-group"><label>ถึงวันที่</label><input type="date" id="h_to"></div>
-    </div>
-  `,`
-    <button class="btn btn-outline" onclick="closeModal()">ยกเลิก</button>
-    <button class="btn btn-primary" onclick="saveHoliday()">บันทึก</button>
-  `);
-}
-
-function saveHoliday() {
-  const name = document.getElementById('h_name').value.trim();
-  const from = document.getElementById('h_from').value;
-  const to = document.getElementById('h_to').value;
-  if(!name||!from||!to) { showToast('กรุณากรอกข้อมูลให้ครบ',''); return; }
-  DB.holidays.push({ id:DB.holidays.length+1, name, from, to });
-  saveDB();
-  closeModal();
-  renderHolidays(document.getElementById('mainContent'));
-  showToast(`เพิ่ม "${name}" สำเร็จ`);
-}
-
-// ============================================================
-// ANNOUNCEMENTS
-// ============================================================
-function renderAnnouncements(el) {
-  el.innerHTML = `
-    <div style="display:flex;justify-content:flex-end;margin-bottom:16px">
-      <button class="btn btn-primary" onclick="openAddAnnouncement()">+ สร้างประกาศ</button>
-    </div>
-    <div style="display:flex;flex-direction:column;gap:12px">
-      ${DB.announcements.map(a=>`
-        <div class="card" style="border-left:4px solid var(--primary)">
-          <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
-            <div>
-              <div style="font-size:15px;font-weight:800">${a.title}</div>
-              <div style="font-size:12px;color:var(--gray-500)">📅 ${a.date} &nbsp; 👥 ${a.target}</div>
-            </div>
-            <div style="display:flex;gap:4px">
-              <button class="btn btn-icon btn-sm" title="แก้ไข" onclick="openEditAnnouncement(${a.id})">✏️</button>
-              <button class="btn btn-icon btn-sm" title="ลบ" onclick="deleteAnnouncement(${a.id})" style="color:var(--danger)">🗑️</button>
-            </div>
-          </div>
-          <div style="font-size:13.5px;color:var(--gray-700);line-height:1.6">${a.body}</div>
-        </div>
-      `).join('')}
-    </div>
-  `;
-}
-
-function openAddAnnouncement() {
-  openModal('สร้างประกาศ', `
-    <div class="form-group"><label>หัวข้อ</label><input id="an_title" placeholder="หัวข้อประกาศ"></div>
-    <div class="form-group">
-      <label>ส่งถึง</label>
-      <select id="an_target">
-        <option>ทุกคน</option>
-        ${DB.courses.map(c=>`<option>${c.name}</option>`).join('')}
-      </select>
-    </div>
-    <div class="form-group"><label>เนื้อหา</label><textarea id="an_body" rows="4" placeholder="รายละเอียดประกาศ..."></textarea></div>
-  `,`
-    <button class="btn btn-outline" onclick="closeModal()">ยกเลิก</button>
-    <button class="btn btn-primary" onclick="saveAnnouncement()">ส่งประกาศ</button>
-  `);
-}
-
-function saveAnnouncement() {
-  const title = document.getElementById('an_title').value.trim();
-  if(!title) { showToast('กรุณากรอกหัวข้อ',''); return; }
-  DB.announcements.unshift({
-    id: Math.max(...DB.announcements.map(a=>a.id), 0)+1, title,
-    target: document.getElementById('an_target').value,
-    body: document.getElementById('an_body').value,
-    date: new Date().toLocaleDateString('th-TH')
-  });
-  saveDB();
-  closeModal();
-  renderAnnouncements(document.getElementById('mainContent'));
-  showToast('ส่งประกาศสำเร็จ 📣');
-}
-
-function openEditAnnouncement(id) {
-  const a = DB.announcements.find(x=>x.id===id);
-  openModal('แก้ไขประกาศ', `
-    <div class="form-group"><label>หัวข้อ</label><input id="ea_title" value="${a.title}"></div>
-    <div class="form-group">
-      <label>ส่งถึง</label>
-      <select id="ea_target">
-        <option ${a.target==='ทุกคน'?'selected':''}>ทุกคน</option>
-        ${DB.courses.map(c=>`<option ${a.target===c.name?'selected':''}>${c.name}</option>`).join('')}
-      </select>
-    </div>
-    <div class="form-group"><label>เนื้อหา</label><textarea id="ea_body" rows="4">${a.body}</textarea></div>
-  `,`
-    <button class="btn btn-outline" onclick="closeModal()">ยกเลิก</button>
-    <button class="btn btn-primary" onclick="updateAnnouncement(${id})">บันทึก</button>
-  `);
-}
-
-function updateAnnouncement(id) {
-  const a = DB.announcements.find(x=>x.id===id);
-  a.title = document.getElementById('ea_title').value;
-  a.target = document.getElementById('ea_target').value;
-  a.body = document.getElementById('ea_body').value;
-  saveDB();
-  closeModal();
-  renderAnnouncements(document.getElementById('mainContent'));
-  showToast('บันทึกสำเร็จ');
-}
-
-function deleteAnnouncement(id) {
-  if(!confirm('ลบประกาศนี้?')) return;
-  DB.announcements = DB.announcements.filter(x=>x.id!==id);
-  saveDB();
-  renderAnnouncements(document.getElementById('mainContent'));
-  showToast('ลบประกาศสำเร็จ');
-}
-
-// ============================================================
-// ENROLLMENT / CREDIT HOURS
+// ENROLLMENT
 // ============================================================
 function renderEnrollment(el) {
-  if (!DB.enrollments) DB.enrollments = [];
-  const all = DB.enrollments;
-  const monthly = all.filter(e => e.paymentType === 'monthly');
-  const packages = all.filter(e => e.paymentType === 'package');
-  const lowHours = all.filter(e => e.status === 'active' && e.totalHours > 0 && (e.totalHours - e.usedHours) <= Math.round(e.totalHours * 2 / 3) && (e.totalHours - e.usedHours) > 0);
-
-  el.innerHTML = `
-    <div class="stat-cards" style="margin-bottom:20px">
-      <div class="stat-card">
-        <div class="stat-icon blue">📋</div>
-        <div><div class="stat-num">${all.filter(e=>e.status==='active').length}</div><div class="stat-label">ลงทะเบียนอยู่</div></div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-icon green">📅</div>
-        <div><div class="stat-num">${monthly.length}</div><div class="stat-label">รายเดือน</div></div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-icon orange">📦</div>
-        <div><div class="stat-num">${packages.length}</div><div class="stat-label">รายคอร์ส</div></div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-icon red">⚠️</div>
-        <div><div class="stat-num">${lowHours.length}</div><div class="stat-label">ชั่วโมงใกล้หมด</div></div>
-      </div>
-    </div>
-
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
-      <div class="tabs" style="margin-bottom:0">
-        <button class="tab-btn active" id="enrTabAll" onclick="filterEnrollments('all',this)">ทั้งหมด (${all.length})</button>
-        <button class="tab-btn" onclick="filterEnrollments('monthly',this)">รายเดือน</button>
-        <button class="tab-btn" onclick="filterEnrollments('package',this)">รายคอร์ส</button>
-        ${lowHours.length>0?`<button class="tab-btn" onclick="filterEnrollments('low',this)" style="color:var(--danger)">⚠️ ใกล้หมด (${lowHours.length})</button>`:''}
-      </div>
-      <button class="btn btn-primary" onclick="openAddEnrollment()">+ ลงทะเบียนนักเรียน</button>
-    </div>
-
-    <div class="search-bar" style="margin-bottom:16px">
+  const q = (typeof enrollSearchVal !== 'undefined') ? enrollSearchVal : '';
+  let html = `
+    <div class="search-bar" style="margin-bottom:20px">
       <div class="search-input-wrap">
         <span class="search-icon">🔍</span>
-        <input id="enrollSearch" placeholder="ค้นหาชื่อนักเรียน หรือชื่อคอร์ส..." oninput="searchEnrollments(this.value)">
+        <input type="text" placeholder="ค้นหาชื่อนักเรียน..." id="enrollSearch" value="${q}" oninput="enrollSearchVal=this.value;renderEnrollment(document.getElementById('mainContent'))">
       </div>
+      <button class="btn btn-primary owner-only" onclick="openAddEnrollment()">+ ลงทะเบียน</button>
     </div>
-
-    <div id="enrollList">${renderEnrollCards(all)}</div>
   `;
+
+  // Group by teacher
+  const coursesByTeacher = {};
+  DB.courses.forEach(c => {
+    if (!coursesByTeacher[c.teacher]) coursesByTeacher[c.teacher] = [];
+    coursesByTeacher[c.teacher].push(c);
+  });
+
+  const teacherOrder = [...new Set(DB.teachers.map(t=>t.name))];
+
+  Object.entries(coursesByTeacher).sort((a,b)=>{
+    return teacherOrder.indexOf(a[0]) - teacherOrder.indexOf(b[0]);
+  }).forEach(([teacher, courses]) => {
+    courses.sort((a,b)=>courseSort(a.name,b.name)).forEach(course => {
+      const enrollments = DB.enrollments.filter(e=>e.courseName===course.name && e.status==='active' && (!q||e.studentName.toLowerCase().includes(q.toLowerCase())));
+      if (!enrollments.length && q) return;
+      html += `
+        <div style="margin-bottom:24px">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+            <div style="width:12px;height:12px;border-radius:50%;background:${course.color}"></div>
+            <span style="font-size:15px;font-weight:800">${course.name}</span>
+            <span style="font-size:12px;color:var(--gray-500)">${teacher}</span>
+            <span class="badge badge-info" style="margin-left:auto">${enrollments.length} คน</span>
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:14px">
+            ${enrollments.map(e=>enrollCardHTML(e)).join('')}
+            ${!enrollments.length?'<div style="color:var(--gray-500);font-size:13px;padding:8px 0">ไม่มีนักเรียนลงทะเบียน</div>':''}
+          </div>
+        </div>
+      `;
+    });
+  });
+
+  // Students with no matching course
+  if (!Object.keys(coursesByTeacher).length) {
+    html += '<div class="empty"><div class="empty-icon">📋</div>ยังไม่มีข้อมูลการลงทะเบียน</div>';
+  }
+
+  el.innerHTML = html;
 }
 
+let enrollSearchVal = '';
+
 function enrollCardHTML(e) {
-  const today = new Date().toISOString().split('T')[0];
-  const isPending = e.startDate > today;
-  const remaining = e.totalHours - e.usedHours;
-  const pct = e.totalHours > 0 ? Math.min(Math.round((e.usedHours/e.totalHours)*100),100) : 0;
-  const warnThreshold = Math.round(e.totalHours * 2 / 3);
-  const barColor = isPending ? 'var(--gray-500)' : remaining <= 0 ? 'var(--danger)' : remaining <= warnThreshold ? 'var(--warning)' : 'var(--success)';
-  const course = DB.courses.find(c => c.name === e.courseName);
-  const topColor = course ? course.color : 'var(--primary)';
-  const nextUnpaid = e.installments && e.installments.find(i=>!i.paid);
-  const paidCount = e.installments ? e.installments.filter(i=>i.paid).length : 0;
-  // Fallback: if nextUnpaid amount is 0/null, compute from remaining balance
-  const paidAmt = e.installments ? e.installments.filter(i=>i.paid).reduce((s,i)=>s+(i.amount||0),0) : 0;
-  const netRemaining = (e.fee||0) - (e.deposit||0) - paidAmt;
-  const nextAmt = nextUnpaid ? (nextUnpaid.amount > 0 ? nextUnpaid.amount : netRemaining) : 0;
-  return `<div class="card" style="border-top:4px solid ${topColor}${isPending?';opacity:0.85':''}">
-    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;gap:8px">
+  const pct = e.totalHours > 0 ? Math.min(100, Math.round((e.usedHours||0)/e.totalHours*100)) : 0;
+  const remain = Math.max(0, (e.totalHours||0)-(e.usedHours||0));
+  const warn = e.totalHours > 0 && remain <= e.totalHours * (1/3);
+  const overWarn = e.totalHours > 0 && remain <= e.totalHours * (1/3) && remain > 0;
+  const colorBar = remain === 0 ? 'var(--danger)' : overWarn ? 'var(--warning)' : 'var(--primary)';
+
+  // Installment info
+  let payInfo = '';
+  if (e.paymentType === 'package' && e.installments && e.installments.length > 0) {
+    const unpaid = e.installments.filter(i=>!i.paid);
+    const nextInst = unpaid[0];
+    if (nextInst) {
+      const isOverdue = nextInst.due && nextInst.due < new Date().toISOString().split('T')[0];
+      payInfo = `<div style="font-size:11px;margin-top:4px;color:${isOverdue?'var(--danger)':'var(--warning)'}">
+        ${isOverdue?'⚠️ เกินกำหนด':'📅 งวดถัดไป'}: ฿${nextInst.amount.toLocaleString()} (${nextInst.due})
+      </div>`;
+    }
+  }
+
+  // Deposit info
+  let depositInfo = '';
+  if (e.deposit && e.deposit > 0) {
+    depositInfo = `<div style="font-size:11px;color:var(--gray-500);margin-top:2px">มัดจำ: ฿${e.deposit.toLocaleString()}</div>`;
+  }
+
+  return `
+  <div class="enroll-card" style="background:#fff;border-radius:12px;padding:16px;box-shadow:0 2px 8px rgba(0,0,0,0.07);min-width:240px;max-width:300px;border-top:3px solid ${warn?(remain===0?'var(--danger)':'var(--warning)'):'var(--primary)'}">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
       <div>
-        <div style="font-weight:800;font-size:14px">${e.studentName}</div>
-        <div style="font-size:12px;color:var(--primary);cursor:pointer;text-decoration:underline dotted" onclick="showPage('courses',null)" title="ดูหน้าคอร์สเรียน">${e.courseName}</div>
-        ${course && course.day ? `<div style="font-size:11px;color:var(--gray-500);margin-top:2px">📅 ${course.day} &nbsp; 🕐 ${course.time}</div>` : ''}
+        <div style="font-weight:800;font-size:14px;cursor:pointer;text-decoration:underline dotted" onclick="openStudentDetail(${DB.students.find(s=>s.name===e.studentName)?.id||0})">${e.studentName}</div>
+        <div style="font-size:11px;color:var(--gray-500)">${e.paymentType==='monthly'?'รายเดือน':'แพ็กเกจ'} · ฿${(e.fee||0).toLocaleString()}</div>
+        ${depositInfo}
       </div>
-      <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end">
-        <span class="badge ${e.paymentType==='monthly'?'badge-info':'badge-success'}" style="font-size:10px;white-space:nowrap">
-          ${e.paymentType==='monthly'?'📅 รายเดือน':'📦 รายคอร์ส'}
-        </span>
-        ${isPending ? `<span class="badge badge-warning" style="font-size:10px;white-space:nowrap">⏳ รอเริ่มเรียน</span>` : ''}
-      </div>
+      ${warn?`<span class="badge ${remain===0?'badge-danger':'badge-warning'}">${remain===0?'หมดชั่วโมง':'ใกล้หมด'}</span>`:''}
     </div>
-    ${isPending ? `
-      <div style="background:#FFF8E1;border:1px solid #FFD54F;border-radius:8px;padding:10px;margin-bottom:12px;font-size:12px">
-        📅 วันเริ่มเรียน: <strong>${e.startDate}</strong>
+    <div style="margin-bottom:6px">
+      <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px">
+        <span>ชั่วโมงที่ใช้: ${e.usedHours||0}/${e.totalHours||0} ชม.</span>
+        <span style="color:${colorBar};font-weight:700">เหลือ ${remain} ชม.</span>
       </div>
-    ` : ''}
-    <div style="display:flex;justify-content:space-between;margin-bottom:4px;align-items:baseline">
-      <span style="font-size:12px;color:var(--gray-500)">ใช้ไป ${e.usedHours} / ${e.totalHours} ชม.</span>
-      <span style="font-size:16px;font-weight:800;color:${barColor}">${isPending?'ยังไม่เริ่ม':remaining+' ชม. คงเหลือ'}</span>
+      <div class="progress"><div class="progress-bar" style="width:${pct}%;background:${colorBar}"></div></div>
     </div>
-    <div class="progress" style="margin-bottom:8px">
-      <div class="progress-bar" style="width:${isPending?0:pct}%;background:${barColor}"></div>
-    </div>
-    ${!isPending && remaining > 0 && remaining <= warnThreshold ? `<div style="font-size:11px;color:var(--warning);margin-bottom:8px">⚠️ ชั่วโมงเรียนใกล้หมด (เหลือ ${remaining}/${e.totalHours} ชม.)</div>` : ''}
-    ${!isPending && remaining <= 0 ? '<div style="font-size:11px;color:var(--danger);font-weight:700;margin-bottom:8px">❌ ชั่วโมงหมดแล้ว — กรุณาต่ออายุ</div>' : ''}
-    ${(e.deposit > 0) ? `
-      <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;font-size:12px;background:#E8F5E9;border-radius:6px;padding:5px 10px">
-        <span>💰 มัดจำ</span>
-        <span style="font-weight:700;color:var(--success)">฿${e.deposit.toLocaleString()}</span>
-        <span style="color:var(--success)">✅ ชำระแล้ว</span>
-        <span style="color:var(--gray-500);margin-left:4px">| คงเหลือ ฿${(e.fee-e.deposit).toLocaleString()}</span>
-      </div>
-    ` : ''}
-    ${e.paymentType==='monthly' ? `
-      <div style="font-size:12px;color:var(--gray-500);margin-bottom:8px">🔄 รีเซตถัดไป: ${e.nextResetDate||'—'} &nbsp; ฿${e.fee.toLocaleString()}/เดือน${e.deposit>0?` (จ่ายมัดจำแล้ว ฿${e.deposit.toLocaleString()})`:''}</div>
-    ` : `
-      <div style="font-size:12px;margin-bottom:8px">
-        💳 งวด: ${paidCount}/${e.installments.length} ชำระแล้ว &nbsp; รวม ฿${(e.fee-(e.deposit||0)).toLocaleString()}${e.deposit>0?` <span style="font-size:11px;color:var(--gray-500)">(หลังหักมัดจำ)</span>`:''}
-        ${nextUnpaid ? `<div style="color:var(--danger);margin-top:4px">งวดถัดไป ฿${nextAmt.toLocaleString()} กำหนด ${nextUnpaid.due}</div>` : '<div style="color:var(--success)">✅ ชำระครบแล้ว</div>'}
-      </div>
-    `}
-    <div style="display:flex;gap:6px;flex-wrap:wrap">
-      ${!isPending && e.paymentType==='monthly' ? `<button class="btn btn-outline btn-sm" onclick="resetMonthlyHours(${e.id})">🔄 รีเซตชั่วโมง</button>` : ''}
-      ${e.paymentType==='package' && nextUnpaid ? `<button class="btn btn-primary btn-sm" onclick="payInstallment(${e.id})">💳 ชำระงวดถัดไป</button>` : ''}
-      <button class="btn btn-icon btn-sm" title="อัพโหลดสลิป" onclick="uploadSlip(${e.id})" title="อัพโหลดสลิป">${e.slipImage?'🖼️':'📎'}</button>
+    ${payInfo}
+    <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap">
       <button class="btn btn-sm" style="background:var(--primary-light,#e8f0fe);color:var(--primary);border:none;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:12px" onclick="openTransferCourse(${e.id})">🔀 ย้ายคอร์ส</button>
       <button class="btn btn-icon btn-sm" title="แก้ไข" onclick="openEditEnrollment(${e.id})">✏️</button>
       <button class="btn btn-icon btn-sm" title="ลบ" onclick="deleteEnrollment(${e.id})" style="color:var(--danger)">🗑️</button>
@@ -2804,313 +2073,118 @@ function enrollCardHTML(e) {
   </div>`;
 }
 
-function renderEnrollCards(list) {
-  if (!list.length) return '<div class="empty"><div class="empty-icon">📋</div>ไม่มีข้อมูล</div>';
-
-  // Group by course name
-  const groups = {};
-  list.forEach(e => {
-    const name = e.courseName || 'ไม่ระบุคอร์ส';
-    if (!groups[name]) groups[name] = [];
-    groups[name].push(e);
-  });
-
-  const courseNames = Object.keys(groups).sort(courseSort);
-  return courseNames.map(courseName => {
-    const course = DB.courses.find(c => c.name === courseName);
-    const teacher = course ? (course.teacher || 'ไม่ระบุครู') : 'ไม่ระบุครู';
-    const color = course ? course.color : 'var(--primary)';
-    return `
-    <div style="margin-bottom:24px">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid var(--primary-light)">
-        <span style="font-size:20px">📚</span>
-        <span style="font-weight:800;font-size:15px;color:var(--primary-dark)">${courseName}</span>
-        <span style="font-size:12px;color:var(--gray-500);display:flex;align-items:center;gap:4px">
-          <span>👩‍🏫 ${teacher}</span>
-          <span style="margin-left:6px">(${groups[courseName].length} คน)</span>
-        </span>
-      </div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px">
-        ${groups[courseName].map(enrollCardHTML).join('')}
-      </div>
-    </div>
-  `}).join('');
-}
-
-function filterEnrollments(type, btn) {
-  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
-  btn.classList.add('active');
-  // clear search when switching tabs
-  const searchEl = document.getElementById('enrollSearch');
-  if (searchEl) searchEl.value = '';
-  const all = DB.enrollments || [];
-  const map = {
-    all: all,
-    monthly: all.filter(e=>e.paymentType==='monthly'),
-    package: all.filter(e=>e.paymentType==='package'),
-    low: all.filter(e=>(e.totalHours-e.usedHours)<=Math.round(e.totalHours*2/3) && e.status==='active' && e.totalHours>0)
-  };
-  document.getElementById('enrollList').innerHTML = renderEnrollCards(map[type]||all);
-}
-
-function searchEnrollments(q) {
-  const all = DB.enrollments || [];
-  const filtered = q.trim() === '' ? all : all.filter(e =>
-    e.studentName.toLowerCase().includes(q.toLowerCase()) ||
-    e.courseName.toLowerCase().includes(q.toLowerCase())
-  );
-  document.getElementById('enrollList').innerHTML = renderEnrollCards(filtered);
-}
-
 function openAddEnrollment() {
-  openModal('ลงทะเบียนนักเรียน', `
-    <div class="form-row">
-      <div class="form-group">
-        <label>นักเรียน</label>
-        <select id="enr_student">${DB.students.filter(s=>s.status==='active').map(s=>`<option>${s.name}</option>`).join('')}</select>
-      </div>
-      <div class="form-group">
-        <label>คอร์ส</label>
-        <select id="enr_course" onchange="enrAutoFill()">${[...DB.courses].sort((a,b)=>courseSort(a.name,b.name)).map(c=>`<option data-fee="${c.fee}" data-hours="${c.sessions||8}">${c.name}</option>`).join('')}</select>
-        <div id="enr_course_hint" style="font-size:11px;color:var(--primary);margin-top:4px"></div>
-      </div>
+  openModal('ลงทะเบียนเรียน', `
+    <div class="form-group">
+      <label>นักเรียน</label>
+      <select id="enr_student">
+        ${DB.students.filter(s=>s.status==='active').map(s=>`<option value="${s.name}">${s.name} (${s.nickname})</option>`).join('')}
+      </select>
     </div>
     <div class="form-group">
-      <label>ประเภทการชำระ</label>
-      <div style="display:flex;gap:20px;margin-top:8px">
-        <label style="display:flex;align-items:center;gap:8px;font-weight:500;cursor:pointer">
-          <input type="radio" name="enr_type" value="monthly" checked onchange="toggleEnrFields()" style="width:auto"> 📅 รายเดือน
-        </label>
-        <label style="display:flex;align-items:center;gap:8px;font-weight:500;cursor:pointer">
-          <input type="radio" name="enr_type" value="package" onchange="toggleEnrFields()" style="width:auto"> 📦 รายคอร์ส
-        </label>
-      </div>
+      <label>คอร์ส</label>
+      <select id="enr_course">
+        ${[...DB.courses].sort((a,b)=>courseSort(a.name,b.name)).map(c=>`<option value="${c.name}">${c.name}</option>`).join('')}
+      </select>
     </div>
     <div class="form-row">
-      <div class="form-group"><label>ค่าเรียน (บาท)</label><input id="enr_fee" type="number" placeholder="2500" oninput="updateDepositPreview()"></div>
-      <div class="form-group"><label id="enr_hours_label">ชั่วโมง/เดือน</label><input id="enr_hours" type="number" placeholder="8"></div>
-    </div>
-    <div class="form-group">
-      <label>มัดจำล่วงหน้า (บาท) <span style="font-weight:400;color:var(--gray-500);font-size:12px">— ไม่บังคับ</span></label>
-      <input id="enr_deposit" type="number" placeholder="0 = ไม่มีมัดจำ" min="0" oninput="updateDepositPreview()">
-      <div id="deposit_preview" style="font-size:12px;color:var(--gray-500);margin-top:4px"></div>
-    </div>
-    <div id="enr_pkg_fields" style="display:none">
       <div class="form-group">
-        <label>จำนวนงวด <span style="font-weight:400;color:var(--gray-500);font-size:12px">(คำนวณจากยอดหลังหักมัดจำ)</span></label>
-        <select id="enr_installments" onchange="updateDepositPreview()">
-          <option value="1">ชำระครั้งเดียว</option>
-          <option value="2">แบ่ง 2 งวด</option>
-          <option value="3">แบ่ง 3 งวด</option>
+        <label>ประเภทชำระ</label>
+        <select id="enr_type" onchange="toggleEnrInstall()">
+          <option value="monthly">รายเดือน</option>
+          <option value="package">แพ็กเกจ</option>
+        </select>
+      </div>
+      <div class="form-group"><label>ค่าเรียน (บาท)</label><input id="enr_fee" type="number" placeholder="2500"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>ชั่วโมงทั้งหมด</label><input id="enr_hours" type="number" placeholder="8"></div>
+      <div class="form-group"><label>วันเริ่มเรียน</label><input id="enr_start" type="date" value="${new Date().toISOString().split('T')[0]}"></div>
+    </div>
+    <div class="form-group"><label>มัดจำ (บาท) — ถ้ามี</label><input id="enr_deposit" type="number" placeholder="0" value="0"></div>
+    <div id="enrInstallSection" style="display:none">
+      <div class="form-group">
+        <label>จำนวนงวด</label>
+        <select id="enr_installments">
+          <option value="1">1 งวด (จ่ายเต็ม)</option>
+          <option value="2">2 งวด</option>
+          <option value="3">3 งวด</option>
+          <option value="4">4 งวด</option>
         </select>
       </div>
     </div>
-    <div class="form-group"><label>วันเริ่มเรียน</label><input type="date" id="enr_start" value="${new Date().toISOString().split('T')[0]}"></div>
   `,`
     <button class="btn btn-outline" onclick="closeModal()">ยกเลิก</button>
     <button class="btn btn-primary" onclick="saveEnrollment()">บันทึก</button>
   `);
-  enrAutoFill();
 }
 
-function enrAutoFill() {
-  const sel = document.getElementById('enr_course');
-  if (!sel) return;
-  const opt = sel.options[sel.selectedIndex];
-  const course = DB.courses.find(c => c.name === sel.value);
-  // ดึงค่าเรียนจากคอร์สอัตโนมัติ
-  const feeInput = document.getElementById('enr_fee');
-  if (feeInput && opt?.dataset?.fee) feeInput.value = opt.dataset.fee;
-  // ดึงชั่วโมงจากคอร์สอัตโนมัติ (sessions*2 ชม./ครั้ง)
-  const hoursInput = document.getElementById('enr_hours');
-  if (hoursInput && course) {
-    const hrs = (course.sessions || 1) * 2; // 2 ชม./ครั้ง
-    hoursInput.value = hrs;
-  }
-  // แสดงวัน/เวลาเรียน
-  const hint = document.getElementById('enr_course_hint');
-  if (hint && course) {
-    hint.textContent = course.day && course.time ? `📅 ${course.day}  🕐 ${course.time}  👩‍🏫 ${course.teacher||''}` : '';
-  }
-  updateDepositPreview();
-}
-
-function toggleEnrFields() {
-  const isPkg = document.querySelector('input[name="enr_type"]:checked')?.value === 'package';
-  document.getElementById('enr_pkg_fields').style.display = isPkg ? 'block' : 'none';
-  const lbl = document.getElementById('enr_hours_label');
-  if (lbl) lbl.textContent = isPkg ? 'ชั่วโมงรวมทั้งคอร์ส' : 'ชั่วโมง/เดือน';
-  updateDepositPreview();
-}
-
-function updateDepositPreview() {
-  const fee = Number(document.getElementById('enr_fee')?.value) || 0;
-  const deposit = Number(document.getElementById('enr_deposit')?.value) || 0;
-  const el = document.getElementById('deposit_preview');
-  if (!el) return;
-  if (deposit <= 0 || fee <= 0) { el.textContent = ''; return; }
-  const remaining = fee - deposit;
-  if (remaining < 0) { el.innerHTML = '<span style="color:var(--danger)">⚠️ มัดจำมากกว่าค่าเรียน</span>'; return; }
-  const isPkg = document.querySelector('input[name="enr_type"]:checked')?.value === 'package';
-  const n = Number(document.getElementById('enr_installments')?.value) || 1;
-  if (isPkg && n > 1) {
-    const perInst = Math.round(remaining / n);
-    el.innerHTML = `✅ มัดจำ ฿${deposit.toLocaleString()} → คงเหลือ ฿${remaining.toLocaleString()} แบ่ง ${n} งวด (งวดละประมาณ ฿${perInst.toLocaleString()})`;
-  } else {
-    el.innerHTML = `✅ มัดจำ ฿${deposit.toLocaleString()} → คงเหลือ ฿${remaining.toLocaleString()}`;
-  }
+function toggleEnrInstall() {
+  const t = document.getElementById('enr_type').value;
+  document.getElementById('enrInstallSection').style.display = t==='package'?'block':'none';
 }
 
 function saveEnrollment() {
-  if (!DB.enrollments) DB.enrollments = [];
-  const type = document.querySelector('input[name="enr_type"]:checked')?.value || 'monthly';
-  const fee = Number(document.getElementById('enr_fee').value) || 0;
-  const hours = Number(document.getElementById('enr_hours').value) || 0;
-  const startDate = document.getElementById('enr_start').value;
   const studentName = document.getElementById('enr_student').value;
   const courseName = document.getElementById('enr_course').value;
-  const deposit = Math.min(Number(document.getElementById('enr_deposit')?.value) || 0, fee);
-  const remaining = fee - deposit;
+  const paymentType = document.getElementById('enr_type').value;
+  const fee = Number(document.getElementById('enr_fee').value)||0;
+  const totalHours = Number(document.getElementById('enr_hours').value)||8;
+  const startDate = document.getElementById('enr_start').value;
+  const deposit = Number(document.getElementById('enr_deposit').value)||0;
 
   let installments = [];
-  if (type === 'package') {
-    const n = Number(document.getElementById('enr_installments').value) || 1;
-    // Installments cover the REMAINING balance after deposit
-    const base = Math.floor(remaining / n);
-    for (let i = 0; i < n; i++) {
-      const d = new Date(startDate);
-      d.setMonth(d.getMonth() + i);
+  if (paymentType === 'package') {
+    const n = Number(document.getElementById('enr_installments').value)||1;
+    const remaining = fee - deposit;
+    const base = Math.floor(remaining/n);
+    for (let i=0;i<n;i++) {
+      const dueDate = new Date(startDate);
+      dueDate.setMonth(dueDate.getMonth()+i);
       installments.push({
         id: i+1,
-        amount: i === n-1 ? remaining - base*(n-1) : base,
-        due: d.toISOString().split('T')[0],
-        paid: remaining === 0 // if fully paid by deposit, mark all paid
+        amount: i===n-1 ? remaining-base*(n-1) : base,
+        due: dueDate.toISOString().split('T')[0],
+        paid: false
       });
     }
   }
 
-  let nextResetDate = null;
-  if (type === 'monthly') {
-    const d = new Date(startDate);
-    d.setMonth(d.getMonth() + 1); d.setDate(1);
-    nextResetDate = d.toISOString().split('T')[0];
-  }
-
+  const maxId = Math.max(...DB.enrollments.map(e=>e.id||0), 0);
   DB.enrollments.push({
-    id: Math.max(...DB.enrollments.map(e=>e.id), 0)+1,
-    studentName, courseName, paymentType: type,
-    fee, deposit, totalHours: hours, usedHours: 0,
-    nextResetDate, installments, status:'active', startDate
+    id: maxId+1,
+    studentName, courseName, paymentType, fee, totalHours,
+    usedHours: 0, deposit,
+    nextResetDate: paymentType==='monthly' ? (() => { const d=new Date(startDate); d.setMonth(d.getMonth()+1); return d.toISOString().split('T')[0]; })() : null,
+    installments,
+    status: 'active',
+    startDate
   });
 
-  // Ensure student is linked to course
+  // Add course to student if not already there
   const student = DB.students.find(s=>s.name===studentName);
   if (student && !student.courses.includes(courseName)) student.courses.push(courseName);
-
-  // Create invoice for deposit (paid immediately)
-  if (deposit > 0) {
-    DB.invoices.push({
-      id: Math.max(...DB.invoices.map(i=>i.id), 0)+1,
-      student: studentName, course: courseName,
-      month: 'มัดจำ',
-      due: startDate,
-      amount: deposit,
-      status: 'paid',
-      note: 'มัดจำล่วงหน้า'
-    });
-  }
-
-  // Auto-create invoices from installments (package)
-  if (type === 'package' && installments.length > 0 && remaining > 0) {
-    installments.forEach(inst => {
-      DB.invoices.push({
-        id: Math.max(...DB.invoices.map(i=>i.id), 0)+1,
-        student: studentName, course: courseName,
-        month: new Date(inst.due).toLocaleDateString('th-TH',{month:'long',year:'numeric'}),
-        due: inst.due,
-        amount: inst.amount,
-        status: inst.paid ? 'paid' : 'unpaid'
-      });
-    });
-  } else if (type === 'monthly' && remaining > 0) {
-    // Auto-create invoice for first month (minus deposit if any)
-    const d = new Date(startDate);
-    DB.invoices.push({
-      id: Math.max(...DB.invoices.map(i=>i.id), 0)+1,
-      student: studentName, course: courseName,
-      month: d.toLocaleDateString('th-TH',{month:'long',year:'numeric'}),
-      due: startDate,
-      amount: remaining > 0 && deposit > 0 ? remaining : fee,
-      status: 'unpaid'
-    });
-  }
 
   saveDB();
   closeModal();
   renderEnrollment(document.getElementById('mainContent'));
-  const depositNote = deposit > 0 ? ` (มัดจำ ฿${deposit.toLocaleString()})` : '';
-  const invoiceNote = type==='package'?` สร้างใบแจ้งหนี้ ${installments.length} งวดแล้ว`:' สร้างใบแจ้งหนี้เดือนแรกแล้ว';
-  showToast(`ลงทะเบียน "${studentName}" สำเร็จ${depositNote} •${invoiceNote}`);
-}
-
-function resetMonthlyHours(id) {
-  const e = DB.enrollments.find(x=>x.id===id);
-  if (!confirm(`รีเซตชั่วโมงเรียนของ ${e.studentName} (${e.courseName})?`)) return;
-  e.usedHours = 0;
-  const d = new Date(e.nextResetDate || new Date());
-  d.setMonth(d.getMonth() + 1);
-  e.nextResetDate = d.toISOString().split('T')[0];
-  saveDB();
-  renderEnrollment(document.getElementById('mainContent'));
-  showToast(`รีเซตชั่วโมง ${e.studentName} สำเร็จ`);
-}
-
-function payInstallment(id) {
-  const e = DB.enrollments.find(x=>x.id===id);
-  const next = e.installments.find(i=>!i.paid);
-  if (!next) return;
-  // Compute correct amount (fallback if stored amount is 0)
-  const paidAmt = e.installments.filter(i=>i.paid).reduce((s,i)=>s+(i.amount||0), 0);
-  const correctAmt = next.amount > 0 ? next.amount : ((e.fee||0) - (e.deposit||0) - paidAmt);
-  if (!confirm(`ชำระงวด ฿${correctAmt.toLocaleString()} ของ ${e.studentName}?`)) return;
-  next.paid = true;
-  next.amount = correctAmt; // fix stored amount too
-  // Sync invoice status
-  const inv = DB.invoices.find(i=>i.student===e.studentName && i.course===e.courseName && i.due===next.due && i.status!=='paid');
-  if (inv) { inv.status = 'paid'; inv.amount = correctAmt; }
-  saveDB();
-  renderEnrollment(document.getElementById('mainContent'));
-  showToast(`ชำระ ฿${correctAmt.toLocaleString()} สำเร็จ`);
+  showToast(`ลงทะเบียน ${studentName} → ${courseName} สำเร็จ`);
 }
 
 function openEditEnrollment(id) {
   const e = DB.enrollments.find(x=>x.id===id);
-  const isMonthly = e.paymentType === 'monthly';
   openModal('แก้ไขการลงทะเบียน', `
     <div style="background:var(--gray-100);border-radius:8px;padding:10px;margin-bottom:16px;font-size:13px">
-      <strong>${e.studentName}</strong>
-      <span class="badge ${isMonthly?'badge-info':'badge-success'}" style="margin-left:8px">${isMonthly?'รายเดือน':'รายคอร์ส'}</span>
-    </div>
-    <div class="form-group">
-      <label>คอร์ส</label>
-      <select id="ee_course">
-        ${[...DB.courses].sort((a,b)=>courseSort(a.name,b.name)).map(c=>`<option value="${c.name}" ${c.name===e.courseName?'selected':''}>${c.name}</option>`).join('')}
-      </select>
+      <strong>${e.studentName}</strong> — ${e.courseName}
     </div>
     <div class="form-row">
-      <div class="form-group"><label>ชั่วโมงรวม</label><input id="ee_total" type="number" value="${e.totalHours}"></div>
-      <div class="form-group"><label>ชั่วโมงที่ใช้ไป</label><input id="ee_used" type="number" value="${e.usedHours}"></div>
+      <div class="form-group"><label>ชั่วโมงทั้งหมด</label><input id="ee_hours" type="number" value="${e.totalHours||0}"></div>
+      <div class="form-group"><label>ชั่วโมงที่ใช้แล้ว</label><input id="ee_used" type="number" value="${e.usedHours||0}"></div>
     </div>
     <div class="form-row">
-      <div class="form-group"><label>ค่าเรียน (บาท)</label><input id="ee_fee" type="number" value="${e.fee}"></div>
-      <div class="form-group"><label>มัดจำ (บาท)</label><input id="ee_deposit" type="number" value="${e.deposit||0}" min="0"></div>
+      <div class="form-group"><label>ค่าเรียน (บาท)</label><input id="ee_fee" type="number" value="${e.fee||0}"></div>
+      <div class="form-group"><label>มัดจำ (บาท)</label><input id="ee_deposit" type="number" value="${e.deposit||0}"></div>
     </div>
-    ${(e.deposit > 0) ? `
-      <div style="font-size:12px;color:var(--success);margin-bottom:8px;padding:6px 10px;background:#E8F5E9;border-radius:6px">
-        ✅ มัดจำ ฿${e.deposit.toLocaleString()} ชำระแล้ว — คงเหลือ ฿${(e.fee - e.deposit).toLocaleString()}
-      </div>
-    ` : ''}
-    ${isMonthly ? `<div class="form-group"><label>วันรีเซตถัดไป</label><input type="date" id="ee_reset" value="${e.nextResetDate||''}"></div>` : ''}
     <div class="form-group">
       <label>สถานะ</label>
       <select id="ee_status">
@@ -3118,50 +2192,41 @@ function openEditEnrollment(id) {
         <option value="inactive" ${e.status==='inactive'?'selected':''}>ไม่ใช้งาน</option>
       </select>
     </div>
-    ${!isMonthly && e.installments.length > 0 ? `
+    ${e.paymentType==='package' && e.installments && e.installments.length > 0 ? `
       <div class="form-group">
-        <label>สถานะงวดชำระ ${e.deposit>0?`<span style="font-size:11px;color:var(--gray-500)">(หลังหักมัดจำ ฿${e.deposit.toLocaleString()})</span>`:''}</label>
+        <label>งวดชำระเงิน</label>
         ${e.installments.map((inst,i)=>`
-          <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--gray-200)">
-            <span style="font-size:13px">งวด ${i+1}: ฿${inst.amount.toLocaleString()} (${inst.due})</span>
-            <label style="display:flex;align-items:center;gap:6px;font-weight:400;cursor:pointer">
-              <input type="checkbox" ${inst.paid?'checked':''} onchange="DB.enrollments.find(x=>x.id==${id}).installments[${i}].paid=this.checked;saveDB()" style="width:auto">
+          <div style="display:flex;align-items:center;gap:10px;padding:8px;background:var(--gray-100);border-radius:8px;margin-bottom:6px">
+            <span style="font-size:13px;flex:1">งวด ${i+1}: ฿${inst.amount.toLocaleString()} — ${inst.due}</span>
+            <label style="display:flex;align-items:center;gap:4px;font-weight:400;cursor:pointer;margin-bottom:0">
+              <input type="checkbox" ${inst.paid?'checked':''} style="width:auto" onchange="toggleInstallPaid(${id},${i},this.checked)">
               ชำระแล้ว
             </label>
           </div>
         `).join('')}
       </div>
-    ` : ''}
+    `:''}
   `,`
     <button class="btn btn-outline" onclick="closeModal()">ยกเลิก</button>
     <button class="btn btn-primary" onclick="updateEnrollment(${id})">บันทึก</button>
   `);
 }
 
+function toggleInstallPaid(enrollId, instIdx, paid) {
+  const e = DB.enrollments.find(x=>x.id===enrollId);
+  if (e && e.installments && e.installments[instIdx]) {
+    e.installments[instIdx].paid = paid;
+    saveDB();
+  }
+}
+
 function updateEnrollment(id) {
   const e = DB.enrollments.find(x=>x.id===id);
-  const oldCourse = e.courseName;
-  const newCourse = document.getElementById('ee_course')?.value || oldCourse;
-  e.courseName = newCourse;
-  e.totalHours = Number(document.getElementById('ee_total').value) || e.totalHours;
-  e.usedHours = Number(document.getElementById('ee_used').value);
-  e.fee = Number(document.getElementById('ee_fee').value) || e.fee;
-  e.deposit = Math.min(Number(document.getElementById('ee_deposit')?.value) || 0, e.fee);
+  e.totalHours = Number(document.getElementById('ee_hours').value)||0;
+  e.usedHours = Number(document.getElementById('ee_used').value)||0;
+  e.fee = Number(document.getElementById('ee_fee').value)||0;
+  e.deposit = Number(document.getElementById('ee_deposit').value)||0;
   e.status = document.getElementById('ee_status').value;
-  if (e.paymentType==='monthly') e.nextResetDate = document.getElementById('ee_reset')?.value || e.nextResetDate;
-
-  // Sync student.courses
-  const student = DB.students.find(s => s.name === e.studentName);
-  if (student && newCourse !== oldCourse) {
-    // Add new course
-    if (!student.courses.includes(newCourse)) student.courses.push(newCourse);
-    // Remove old course only if no other active enrollment uses it
-    const stillInOld = DB.enrollments.some(x => x.id !== id && x.studentName === e.studentName && x.courseName === oldCourse && x.status === 'active');
-    if (!stillInOld) student.courses = student.courses.filter(c => c !== oldCourse);
-  } else if (student && !student.courses.includes(newCourse)) {
-    student.courses.push(newCourse);
-  }
-
   saveDB();
   closeModal();
   renderEnrollment(document.getElementById('mainContent'));
@@ -3193,7 +2258,6 @@ function doTransferCourse(id) {
   const newCourse = document.getElementById('transfer_course').value;
   if (!newCourse || newCourse === oldCourse) { closeModal(); return; }
   e.courseName = newCourse;
-  // Sync student.courses
   const student = DB.students.find(s => s.name === e.studentName);
   if (student) {
     if (!student.courses.includes(newCourse)) student.courses.push(newCourse);
@@ -3208,196 +2272,611 @@ function doTransferCourse(id) {
 
 function deleteEnrollment(id) {
   const e = DB.enrollments.find(x=>x.id===id);
-  if (!confirm(`ลบการลงทะเบียน ${e.studentName} (${e.courseName})?`)) return;
+  if (!confirm(`ลบการลงทะเบียน ${e.studentName} — ${e.courseName}?`)) return;
   DB.enrollments = DB.enrollments.filter(x=>x.id!==id);
-  // Remove course from student if no other active enrollment for this course
-  const student = DB.students.find(s => s.name === e.studentName);
-  if (student) {
-    const stillInCourse = DB.enrollments.some(x => x.studentName === e.studentName && x.courseName === e.courseName && x.status === 'active');
-    if (!stillInCourse) student.courses = student.courses.filter(c => c !== e.courseName);
-  }
   saveDB();
   renderEnrollment(document.getElementById('mainContent'));
+  showToast('ลบการลงทะเบียนสำเร็จ');
+}
+
+// ============================================================
+// MAKEUP
+// ============================================================
+function renderMakeup(el) {
+  el.innerHTML = `
+    <div style="display:flex;justify-content:flex-end;margin-bottom:16px">
+      <button class="btn btn-primary" onclick="openAddMakeup()">+ ขอเรียนชดเชย</button>
+    </div>
+    <div class="card">
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>นักเรียน</th><th>คอร์ส</th><th>จากวัน</th><th>ชดเชยวัน</th><th>สถานะ</th><th>จัดการ</th></tr></thead>
+          <tbody>
+            ${DB.makeup.length===0?'<tr><td colspan="6" class="empty">ไม่มีคำขอ</td></tr>':
+              DB.makeup.map(m=>`<tr>
+                <td>${m.student}</td>
+                <td>${m.course}</td>
+                <td>${m.from}</td>
+                <td>${m.to}</td>
+                <td>${m.status==='pending'?'<span class="badge badge-warning">รอดำเนินการ</span>':m.status==='approved'?'<span class="badge badge-success">อนุมัติ</span>':'<span class="badge badge-danger">ไม่อนุมัติ</span>'}</td>
+                <td style="white-space:nowrap">
+                  ${m.status==='pending'?`
+                    <button class="btn btn-sm owner-only" style="background:#E8F5E9;color:var(--success);border:none" onclick="approveMakeup(${m.id})">✅ อนุมัติ</button>
+                    <button class="btn btn-sm owner-only" style="background:#FFEBEE;color:var(--danger);border:none" onclick="rejectMakeup(${m.id})">❌ ไม่อนุมัติ</button>
+                  `:''}
+                  <button class="btn btn-icon btn-sm owner-only" onclick="deleteMakeup(${m.id})" style="color:var(--danger)">🗑️</button>
+                </td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+function openAddMakeup() {
+  openModal('ขอเรียนชดเชย', `
+    <div class="form-group">
+      <label>นักเรียน</label>
+      <select id="mk_student">
+        ${DB.students.filter(s=>s.status==='active').map(s=>`<option value="${s.name}">${s.name}</option>`).join('')}
+      </select>
+    </div>
+    <div class="form-group">
+      <label>คอร์ส</label>
+      <select id="mk_course">
+        ${[...DB.courses].sort((a,b)=>courseSort(a.name,b.name)).map(c=>`<option value="${c.name}">${c.name}</option>`).join('')}
+      </select>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>วันที่ขาด</label><input id="mk_from" type="text" placeholder="2026-06-03 อ 15:00"></div>
+      <div class="form-group"><label>วันชดเชย</label><input id="mk_to" type="text" placeholder="2026-06-07 ส 10:00"></div>
+    </div>
+  `,`
+    <button class="btn btn-outline" onclick="closeModal()">ยกเลิก</button>
+    <button class="btn btn-primary" onclick="saveMakeup()">บันทึก</button>
+  `);
+}
+
+function saveMakeup() {
+  const maxId = Math.max(...DB.makeup.map(m=>m.id||0), 0);
+  const today = new Date();
+  const thaiMonths = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+  const created = `${today.getDate()} ${thaiMonths[today.getMonth()]} ${today.getFullYear()+543}`;
+  DB.makeup.push({
+    id: maxId+1,
+    student: document.getElementById('mk_student').value,
+    course: document.getElementById('mk_course').value,
+    from: document.getElementById('mk_from').value,
+    to: document.getElementById('mk_to').value,
+    status: 'pending',
+    created
+  });
+  saveDB();
+  closeModal();
+  renderMakeup(document.getElementById('mainContent'));
+  showToast('บันทึกคำขอสำเร็จ');
+}
+
+function approveMakeup(id) {
+  const m = DB.makeup.find(x=>x.id===id);
+  m.status = 'approved';
+  saveDB();
+  renderMakeup(document.getElementById('mainContent'));
+  showToast('อนุมัติคำขอสำเร็จ ✅');
+}
+
+function rejectMakeup(id) {
+  const m = DB.makeup.find(x=>x.id===id);
+  m.status = 'rejected';
+  saveDB();
+  renderMakeup(document.getElementById('mainContent'));
+  showToast('ไม่อนุมัติคำขอ');
+}
+
+function deleteMakeup(id) {
+  if(!confirm('ลบคำขอนี้?')) return;
+  DB.makeup = DB.makeup.filter(x=>x.id!==id);
+  saveDB();
+  renderMakeup(document.getElementById('mainContent'));
   showToast('ลบสำเร็จ');
 }
 
 // ============================================================
-// PAYMENT SLIP UPLOAD
+// PROGRESS
 // ============================================================
-function uploadSlip(enrollId) {
-  const e = DB.enrollments.find(x=>x.id===enrollId);
-  if (!e) return;
-  // If slip exists, show preview first with option to replace
-  if (e.slipImage) {
-    openModal(`สลิปการโอนเงิน — ${e.studentName}`,
-      `<div style="text-align:center">
-        <img src="${e.slipImage}" style="max-width:100%;max-height:400px;border-radius:8px;border:1px solid var(--gray-200)">
-        <div style="margin-top:12px;font-size:12px;color:var(--gray-500)">อัพโหลดเมื่อ: ${e.slipDate||'—'}</div>
-      </div>`,
-      `<button class="btn btn-outline" onclick="closeModal()">ปิด</button>
-       <button class="btn btn-primary" onclick="closeModal();triggerSlipUpload(${enrollId})">📎 เปลี่ยนรูป</button>`
-    );
-    return;
+function renderProgress(el) {
+  el.innerHTML = `
+    <div class="card">
+      <div class="card-header"><span class="card-title">ความก้าวหน้านักเรียน</span></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>นักเรียน</th><th>คอร์ส</th><th>ชั่วโมงที่ใช้</th><th>ชั่วโมงทั้งหมด</th><th>ความก้าวหน้า</th></tr></thead>
+          <tbody>
+            ${DB.enrollments.filter(e=>e.status==='active').map(e=>{
+              const pct = e.totalHours > 0 ? Math.min(100, Math.round((e.usedHours||0)/e.totalHours*100)) : 0;
+              return `<tr>
+                <td><strong>${e.studentName}</strong></td>
+                <td>${e.courseName}</td>
+                <td>${e.usedHours||0} ชม.</td>
+                <td>${e.totalHours||0} ชม.</td>
+                <td style="min-width:120px">
+                  <div style="display:flex;align-items:center;gap:8px">
+                    <div class="progress" style="flex:1"><div class="progress-bar" style="width:${pct}%;background:${pct>=80?'var(--danger)':pct>=50?'var(--warning)':'var(--primary)'}"></div></div>
+                    <span style="font-size:12px;font-weight:700;min-width:32px">${pct}%</span>
+                  </div>
+                </td>
+              </tr>`;
+            }).join('') || '<tr><td colspan="5" class="empty">ไม่มีข้อมูล</td></tr>'}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+// ============================================================
+// FINANCE
+// ============================================================
+function renderFinance(el) {
+  const statusTabs = ['ทั้งหมด','unpaid','overdue','paid'];
+  const statusLabel = {unpaid:'ค้างชำระ',overdue:'เกินกำหนด',paid:'ชำระแล้ว'};
+  let currentTab = 'ทั้งหมด';
+
+  function renderInvoiceTable(tab) {
+    const filtered = tab==='ทั้งหมด' ? DB.invoices : DB.invoices.filter(i=>i.status===tab);
+    return `
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>นักเรียน</th><th>คอร์ส</th><th>เดือน</th><th>จำนวนเงิน</th><th>ครบกำหนด</th><th>สถานะ</th><th>จัดการ</th></tr></thead>
+          <tbody>
+            ${filtered.length===0?'<tr><td colspan="7" class="empty">ไม่มีข้อมูล</td></tr>':
+              filtered.map(i=>`<tr>
+                <td>${i.student}</td>
+                <td>${i.course}</td>
+                <td>${i.month}</td>
+                <td style="font-weight:700">฿${(i.amount||0).toLocaleString()}</td>
+                <td>${i.due}</td>
+                <td>${statusBadge(i.status)}</td>
+                <td style="white-space:nowrap">
+                  ${i.status!=='paid'?`<button class="btn btn-sm owner-only" style="background:#E8F5E9;color:var(--success);border:none" onclick="markPaid(${i.id})">✅ รับเงิน</button>`:''}
+                  <button class="btn btn-icon btn-sm owner-only" onclick="deleteInvoice(${i.id})" style="color:var(--danger)">🗑️</button>
+                </td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
   }
-  triggerSlipUpload(enrollId);
+
+  el.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px">
+      <div>
+        <div style="font-size:13px;color:var(--gray-500)">รายได้เดือนนี้</div>
+        <div style="font-size:24px;font-weight:800;color:var(--primary)">฿${DB.invoices.filter(i=>i.status==='paid').reduce((s,i)=>s+(i.amount||0),0).toLocaleString()}</div>
+      </div>
+      <button class="btn btn-primary owner-only" onclick="openAddInvoice()">+ สร้างใบแจ้งหนี้</button>
+    </div>
+    <div class="tabs" id="financeTabs">
+      ${statusTabs.map(t=>`<button class="tab-btn ${t==='ทั้งหมด'?'active':''}" onclick="switchFinanceTab('${t}',this)">${t==='ทั้งหมด'?'ทั้งหมด':statusLabel[t]}</button>`).join('')}
+    </div>
+    <div class="card" id="invoiceTableWrap">
+      ${renderInvoiceTable('ทั้งหมด')}
+    </div>
+  `;
 }
 
-function triggerSlipUpload(enrollId) {
-  const input = document.createElement('input');
-  input.type = 'file';
-  input.accept = 'image/*';
-  input.onchange = function() {
-    const file = input.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = function(ev) {
-      // Compress via canvas
-      const img = new Image();
-      img.onload = function() {
-        const MAX = 800;
-        let w = img.width, h = img.height;
-        if (w > MAX || h > MAX) {
-          if (w > h) { h = Math.round(h*MAX/w); w=MAX; }
-          else { w = Math.round(w*MAX/h); h=MAX; }
-        }
-        const canvas = document.createElement('canvas');
-        canvas.width=w; canvas.height=h;
-        canvas.getContext('2d').drawImage(img,0,0,w,h);
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
-        const enr = DB.enrollments.find(x=>x.id===enrollId);
-        if (enr) {
-          enr.slipImage = dataUrl;
-          enr.slipDate = new Date().toLocaleDateString('th-TH');
-          saveDB();
-          renderEnrollment(document.getElementById('mainContent'));
-          showToast('อัพโหลดสลิปสำเร็จ 🖼️');
-        }
-      };
-      img.src = ev.target.result;
-    };
-    reader.readAsDataURL(file);
-  };
-  input.click();
+function switchFinanceTab(tab, el) {
+  document.querySelectorAll('#financeTabs .tab-btn').forEach(b=>b.classList.remove('active'));
+  el.classList.add('active');
+  const filtered = tab==='ทั้งหมด' ? DB.invoices : DB.invoices.filter(i=>i.status===tab);
+  const statusLabel = {unpaid:'ค้างชำระ',overdue:'เกินกำหนด',paid:'ชำระแล้ว'};
+  document.getElementById('invoiceTableWrap').innerHTML = `
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>นักเรียน</th><th>คอร์ส</th><th>เดือน</th><th>จำนวนเงิน</th><th>ครบกำหนด</th><th>สถานะ</th><th>จัดการ</th></tr></thead>
+        <tbody>
+          ${filtered.length===0?'<tr><td colspan="7" class="empty">ไม่มีข้อมูล</td></tr>':
+            filtered.map(i=>`<tr>
+              <td>${i.student}</td>
+              <td>${i.course}</td>
+              <td>${i.month}</td>
+              <td style="font-weight:700">฿${(i.amount||0).toLocaleString()}</td>
+              <td>${i.due}</td>
+              <td>${statusBadge(i.status)}</td>
+              <td style="white-space:nowrap">
+                ${i.status!=='paid'?`<button class="btn btn-sm owner-only" style="background:#E8F5E9;color:var(--success);border:none" onclick="markPaid(${i.id})">✅ รับเงิน</button>`:''}
+                <button class="btn btn-icon btn-sm owner-only" onclick="deleteInvoice(${i.id})" style="color:var(--danger)">🗑️</button>
+              </td>
+            </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+function statusBadge(s) {
+  if(s==='paid') return '<span class="badge badge-success">ชำระแล้ว</span>';
+  if(s==='unpaid') return '<span class="badge badge-warning">ค้างชำระ</span>';
+  if(s==='overdue') return '<span class="badge badge-danger">เกินกำหนด</span>';
+  return `<span class="badge">${s}</span>`;
+}
+
+function markPaid(id) {
+  const inv = DB.invoices.find(i=>i.id===id);
+  if (!inv) return;
+  inv.status = 'paid';
+  saveDB();
+  renderFinance(document.getElementById('mainContent'));
+  showToast('บันทึกการรับเงินสำเร็จ ✅');
+}
+
+function deleteInvoice(id) {
+  if(!confirm('ลบใบแจ้งหนี้นี้?')) return;
+  DB.invoices = DB.invoices.filter(i=>i.id!==id);
+  saveDB();
+  renderFinance(document.getElementById('mainContent'));
+  showToast('ลบสำเร็จ');
+}
+
+function openAddInvoice() {
+  const thaiMonths=['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
+  const now = new Date();
+  const month = `${thaiMonths[now.getMonth()]} ${now.getFullYear()+543}`;
+  const dueDate = new Date(now.getFullYear(), now.getMonth()+1, 10).toISOString().split('T')[0];
+  openModal('สร้างใบแจ้งหนี้', `
+    <div class="form-group">
+      <label>นักเรียน</label>
+      <select id="inv_student">
+        ${DB.students.filter(s=>s.status==='active').map(s=>`<option value="${s.name}">${s.name}</option>`).join('')}
+      </select>
+    </div>
+    <div class="form-group">
+      <label>คอร์ส</label>
+      <select id="inv_course">
+        ${[...DB.courses].sort((a,b)=>courseSort(a.name,b.name)).map(c=>`<option value="${c.name}">${c.name}</option>`).join('')}
+      </select>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>จำนวนเงิน (บาท)</label><input id="inv_amount" type="number" placeholder="2500"></div>
+      <div class="form-group"><label>เดือน</label><input id="inv_month" value="${month}"></div>
+    </div>
+    <div class="form-group"><label>ครบกำหนด</label><input id="inv_due" type="date" value="${dueDate}"></div>
+  `,`
+    <button class="btn btn-outline" onclick="closeModal()">ยกเลิก</button>
+    <button class="btn btn-primary" onclick="saveInvoice()">บันทึก</button>
+  `);
+}
+
+function saveInvoice() {
+  const maxId = Math.max(...DB.invoices.map(i=>i.id||0), 0);
+  DB.invoices.push({
+    id: maxId+1,
+    student: document.getElementById('inv_student').value,
+    course: document.getElementById('inv_course').value,
+    amount: Number(document.getElementById('inv_amount').value)||0,
+    month: document.getElementById('inv_month').value,
+    status: 'unpaid',
+    due: document.getElementById('inv_due').value
+  });
+  saveDB();
+  closeModal();
+  renderFinance(document.getElementById('mainContent'));
+  showToast('สร้างใบแจ้งหนี้สำเร็จ');
 }
 
 // ============================================================
+// SALARY
 // ============================================================
-// PIN LOCK — 2 ระดับ: ผู้ช่วย / เจ้าของ
-// ============================================================
-const PINS = { '0202': 'assistant', '0405': 'owner' };
-const PIN_LEN = 4;
-const PIN_KEY  = 'baangenius_unlocked';
-const ROLE_KEY = 'baangenius_role';
-// หน้าที่ผู้ช่วยเข้าได้ (ดูได้แต่บางหน้าแก้ไขไม่ได้)
-const ASSISTANT_PAGES = new Set(['dashboard','attendance','enrollment','students','teachers','courses','schedule']);
-let pinBuffer = '';
-let currentRole = ''; // 'owner' | 'assistant'
-
-function getRole() { return localStorage.getItem(ROLE_KEY) || ''; }
-
-function applyRole(role) {
-  currentRole = role;
-  document.body.classList.toggle('assistant-mode', role === 'assistant');
-  // แสดง/ซ่อน nav items ตามสิทธิ์
-  document.querySelectorAll('.nav-item[data-page]').forEach(el => {
-    const p = el.getAttribute('data-page');
-    el.style.display = (role === 'owner' || ASSISTANT_PAGES.has(p)) ? '' : 'none';
-  });
-  document.querySelectorAll('.nav-section-label[data-owner]').forEach(el => {
-    el.style.display = role === 'owner' ? '' : 'none';
-  });
-  // bottom nav: ซ่อนปุ่มการเงินสำหรับผู้ช่วย
-  ['finance'].forEach(p => {
-    const b = document.getElementById('bnav-' + p);
-    if (b) b.style.display = (role === 'owner') ? '' : 'none';
-  });
-  // แสดง role badge ใน topbar
-  const badge = document.getElementById('roleBadge');
-  if (badge) {
-    badge.textContent = role === 'owner' ? '👑 Director' : '🙋 ผู้ช่วย';
-    badge.style.color = role === 'owner' ? 'var(--primary)' : 'var(--warning)';
-  }
+function renderSalary(el) {
+  el.innerHTML = `
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">ค่าตอบแทน Teachers</span>
+        <button class="btn btn-primary btn-sm owner-only" onclick="openAddSalary()">+ เพิ่มรายการ</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Teacher</th><th>เดือน</th><th>เงินเดือน</th><th>โบนัส</th><th>รวม</th><th>สถานะ</th><th>จัดการ</th></tr></thead>
+          <tbody>
+            ${(DB.salary||[]).length===0?'<tr><td colspan="7" class="empty">ไม่มีข้อมูล</td></tr>':
+              (DB.salary||[]).map(s=>`<tr>
+                <td><strong>${s.teacher}</strong></td>
+                <td>${s.month}</td>
+                <td>฿${(s.base||0).toLocaleString()}</td>
+                <td>${s.bonus?'฿'+s.bonus.toLocaleString():'-'}</td>
+                <td style="font-weight:800">฿${((s.base||0)+(s.bonus||0)).toLocaleString()}</td>
+                <td>${s.paid?'<span class="badge badge-success">จ่ายแล้ว</span>':'<span class="badge badge-warning">ยังไม่จ่าย</span>'}</td>
+                <td style="white-space:nowrap">
+                  ${!s.paid?`<button class="btn btn-sm owner-only" style="background:#E8F5E9;color:var(--success);border:none" onclick="markSalaryPaid(${s.id})">✅ จ่ายแล้ว</button>`:''}
+                  <button class="btn btn-icon btn-sm owner-only" onclick="deleteSalary(${s.id})" style="color:var(--danger)">🗑️</button>
+                </td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
 }
 
-function pinPress(digit) {
-  if (pinBuffer.length >= PIN_LEN) return;
-  pinBuffer += digit;
+function markSalaryPaid(id) {
+  const s = DB.salary.find(x=>x.id===id);
+  if(s) s.paid=true;
+  saveDB();
+  renderSalary(document.getElementById('mainContent'));
+  showToast('บันทึกการจ่ายสำเร็จ ✅');
+}
+
+function deleteSalary(id) {
+  if(!confirm('ลบรายการนี้?')) return;
+  DB.salary = DB.salary.filter(x=>x.id!==id);
+  saveDB();
+  renderSalary(document.getElementById('mainContent'));
+  showToast('ลบสำเร็จ');
+}
+
+function openAddSalary() {
+  const thaiMonths=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+  const now = new Date();
+  const month = `${thaiMonths[now.getMonth()]} ${now.getFullYear()+543}`;
+  openModal('เพิ่มรายการค่าตอบแทน', `
+    <div class="form-group">
+      <label>Teacher</label>
+      <select id="sal_teacher">
+        ${DB.teachers.map(t=>`<option value="${t.name}">${t.name} (${t.fullname})</option>`).join('')}
+      </select>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>เดือน</label><input id="sal_month" value="${month}"></div>
+      <div class="form-group"><label>เงินเดือน (บาท)</label><input id="sal_base" type="number" placeholder="20000"></div>
+    </div>
+    <div class="form-group"><label>โบนัส (บาท)</label><input id="sal_bonus" type="number" placeholder="0" value="0"></div>
+  `,`
+    <button class="btn btn-outline" onclick="closeModal()">ยกเลิก</button>
+    <button class="btn btn-primary" onclick="saveSalary()">บันทึก</button>
+  `);
+}
+
+function saveSalary() {
+  const maxId = Math.max(...(DB.salary||[]).map(s=>s.id||0), 0);
+  if(!DB.salary) DB.salary=[];
+  DB.salary.push({
+    id: maxId+1,
+    teacher: document.getElementById('sal_teacher').value,
+    month: document.getElementById('sal_month').value,
+    base: Number(document.getElementById('sal_base').value)||0,
+    bonus: Number(document.getElementById('sal_bonus').value)||0,
+    paid: false
+  });
+  saveDB();
+  closeModal();
+  renderSalary(document.getElementById('mainContent'));
+  showToast('บันทึกสำเร็จ');
+}
+
+// ============================================================
+// HOLIDAYS
+// ============================================================
+function renderHolidays(el) {
+  el.innerHTML = `
+    <div style="display:flex;justify-content:flex-end;margin-bottom:16px">
+      <button class="btn btn-primary owner-only" onclick="openAddHoliday()">+ เพิ่มวันหยุด</button>
+    </div>
+    <div class="card">
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>ชื่อวันหยุด</th><th>จาก</th><th>ถึง</th><th>จัดการ</th></tr></thead>
+          <tbody>
+            ${DB.holidays.length===0?'<tr><td colspan="4" class="empty">ไม่มีข้อมูล</td></tr>':
+              DB.holidays.map(h=>`<tr>
+                <td><strong>${h.name}</strong></td>
+                <td>${h.from}</td>
+                <td>${h.to}</td>
+                <td><button class="btn btn-icon btn-sm owner-only" onclick="deleteHoliday(${h.id})" style="color:var(--danger)">🗑️</button></td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+function openAddHoliday() {
+  openModal('เพิ่มวันหยุด', `
+    <div class="form-group"><label>ชื่อวันหยุด</label><input id="hol_name" placeholder="วันหยุดราชการ"></div>
+    <div class="form-row">
+      <div class="form-group"><label>จาก</label><input id="hol_from" type="date"></div>
+      <div class="form-group"><label>ถึง</label><input id="hol_to" type="date"></div>
+    </div>
+  `,`
+    <button class="btn btn-outline" onclick="closeModal()">ยกเลิก</button>
+    <button class="btn btn-primary" onclick="saveHoliday()">บันทึก</button>
+  `);
+}
+
+function saveHoliday() {
+  const name = document.getElementById('hol_name').value.trim();
+  if(!name) { showToast('กรุณากรอกชื่อวันหยุด',''); return; }
+  const maxId = Math.max(...DB.holidays.map(h=>h.id||0), 0);
+  DB.holidays.push({
+    id: maxId+1,
+    name,
+    from: document.getElementById('hol_from').value,
+    to: document.getElementById('hol_to').value
+  });
+  saveDB();
+  closeModal();
+  renderHolidays(document.getElementById('mainContent'));
+  showToast('เพิ่มวันหยุดสำเร็จ');
+}
+
+function deleteHoliday(id) {
+  if(!confirm('ลบวันหยุดนี้?')) return;
+  DB.holidays = DB.holidays.filter(h=>h.id!==id);
+  saveDB();
+  renderHolidays(document.getElementById('mainContent'));
+  showToast('ลบสำเร็จ');
+}
+
+// ============================================================
+// ANNOUNCEMENTS
+// ============================================================
+function renderAnnouncements(el) {
+  el.innerHTML = `
+    <div style="display:flex;justify-content:flex-end;margin-bottom:16px">
+      <button class="btn btn-primary owner-only" onclick="openAddAnnouncement()">+ เพิ่มประกาศ</button>
+    </div>
+    ${DB.announcements.length===0?'<div class="empty"><div class="empty-icon">📣</div>ยังไม่มีประกาศ</div>':
+      DB.announcements.map(a=>`
+        <div class="card" style="margin-bottom:12px">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
+            <div>
+              <div style="font-size:15px;font-weight:800">${a.title}</div>
+              <div style="font-size:12px;color:var(--gray-500)">${a.date} · ${a.target}</div>
+            </div>
+            <button class="btn btn-icon btn-sm owner-only" onclick="deleteAnnouncement(${a.id})" style="color:var(--danger)">🗑️</button>
+          </div>
+          <div style="font-size:13.5px;line-height:1.6">${a.body}</div>
+        </div>
+      `).join('')}
+  `;
+}
+
+function openAddAnnouncement() {
+  openModal('เพิ่มประกาศ', `
+    <div class="form-group"><label>หัวข้อ</label><input id="ann_title" placeholder="หัวข้อประกาศ"></div>
+    <div class="form-group"><label>เนื้อหา</label><textarea id="ann_body" rows="4" placeholder="รายละเอียดประกาศ..."></textarea></div>
+    <div class="form-group">
+      <label>กลุ่มเป้าหมาย</label>
+      <select id="ann_target">
+        <option value="ทุกคน">ทุกคน</option>
+        ${[...DB.courses].sort((a,b)=>courseSort(a.name,b.name)).map(c=>`<option value="${c.name}">${c.name}</option>`).join('')}
+      </select>
+    </div>
+  `,`
+    <button class="btn btn-outline" onclick="closeModal()">ยกเลิก</button>
+    <button class="btn btn-primary" onclick="saveAnnouncement()">บันทึก</button>
+  `);
+}
+
+function saveAnnouncement() {
+  const title = document.getElementById('ann_title').value.trim();
+  if(!title) { showToast('กรุณากรอกหัวข้อ',''); return; }
+  const maxId = Math.max(...DB.announcements.map(a=>a.id||0), 0);
+  const today = new Date();
+  const thaiMonths = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+  DB.announcements.unshift({
+    id: maxId+1,
+    title,
+    body: document.getElementById('ann_body').value,
+    date: `${today.getDate().toString().padStart(2,'0')} ${thaiMonths[today.getMonth()]} ${today.getFullYear()+543}`,
+    target: document.getElementById('ann_target').value
+  });
+  saveDB();
+  closeModal();
+  renderAnnouncements(document.getElementById('mainContent'));
+  showToast('เพิ่มประกาศสำเร็จ');
+}
+
+function deleteAnnouncement(id) {
+  if(!confirm('ลบประกาศนี้?')) return;
+  DB.announcements = DB.announcements.filter(a=>a.id!==id);
+  saveDB();
+  renderAnnouncements(document.getElementById('mainContent'));
+  showToast('ลบสำเร็จ');
+}
+
+// ============================================================
+// PIN + AUTH
+// ============================================================
+const PINS = { owner: '1234', assistant: '5678' };
+let currentRole = 'owner';
+const ASSISTANT_PAGES = new Set(['dashboard','students','attendance','enrollment','makeup','progress']);
+let pinEntry = '';
+
+function pinPress(d) {
+  if (pinEntry.length >= 4) return;
+  pinEntry += d;
   updatePinDots();
-  if (pinBuffer.length === PIN_LEN) setTimeout(checkPin, 120);
+  if (pinEntry.length === 4) setTimeout(checkPin, 100);
 }
 
 function pinDel() {
-  pinBuffer = pinBuffer.slice(0, -1);
-  document.getElementById('pinError').textContent = '';
+  pinEntry = pinEntry.slice(0,-1);
   updatePinDots();
+  document.getElementById('pinError').textContent = '';
 }
 
 function updatePinDots() {
-  for (let i = 0; i < PIN_LEN; i++) {
-    const dot = document.getElementById('pd' + i);
-    if (dot) dot.className = 'pin-dot' + (i < pinBuffer.length ? ' filled' : '');
+  for(let i=0;i<4;i++) {
+    const dot = document.getElementById('pd'+i);
+    dot.className = 'pin-dot' + (i<pinEntry.length?' filled':'');
   }
 }
 
 function checkPin() {
-  const role = PINS[pinBuffer];
-  if (role) {
-    localStorage.setItem(PIN_KEY, 'yes');
-    localStorage.setItem(ROLE_KEY, role);
+  if (pinEntry === PINS.owner) {
+    currentRole = 'owner';
+    document.body.classList.remove('assistant-mode');
+    document.getElementById('roleBadge').textContent = '👑 เจ้าของ';
+    document.getElementById('roleBadge').style.background = '#FFF3E0';
+    document.getElementById('roleBadge').style.color = '#E65100';
     document.getElementById('pinScreen').classList.add('hidden');
-    applyRole(role);
-    // ผู้ช่วย → เปิดหน้าเช็คชื่อทันที
-    if (role === 'assistant') showPage('attendance', null);
+    initApp();
+  } else if (pinEntry === PINS.assistant) {
+    currentRole = 'assistant';
+    document.body.classList.add('assistant-mode');
+    document.getElementById('roleBadge').textContent = '👩‍🏫 ผู้ช่วย';
+    document.getElementById('roleBadge').style.background = '#E3F2FD';
+    document.getElementById('roleBadge').style.color = '#1565C0';
+    document.getElementById('pinScreen').classList.add('hidden');
+    initApp();
   } else {
-    document.querySelectorAll('.pin-dot').forEach(d => d.className = 'pin-dot error');
     document.getElementById('pinError').textContent = 'รหัสไม่ถูกต้อง ลองใหม่';
-    setTimeout(() => { pinBuffer = ''; updatePinDots(); document.getElementById('pinError').textContent = ''; }, 800);
+    for(let i=0;i<4;i++) document.getElementById('pd'+i).className='pin-dot error';
+    setTimeout(()=>{
+      pinEntry='';
+      updatePinDots();
+      document.getElementById('pinError').textContent='';
+    },800);
   }
 }
 
 function logout() {
-  localStorage.removeItem(PIN_KEY);
-  localStorage.removeItem(ROLE_KEY);
-  pinBuffer = '';
+  pinEntry='';
   updatePinDots();
+  document.getElementById('pinError').textContent='';
   document.getElementById('pinScreen').classList.remove('hidden');
 }
 
-// Check if already unlocked on this device
-(function checkPinOnLoad() {
-  if (localStorage.getItem(PIN_KEY) === 'yes') {
-    document.getElementById('pinScreen').classList.add('hidden');
-    applyRole(getRole());
-    if (getRole() === 'assistant') showPage('attendance', null);
+// ============================================================
+// APP INIT
+// ============================================================
+function initApp() {
+  document.getElementById('badge-students').textContent = DB.students.filter(s=>s.status==='active').length;
+  // Hide owner-only items for assistant
+  if (currentRole === 'assistant') {
+    document.querySelectorAll('[data-owner]').forEach(el=>el.style.display='none');
   }
-  document.addEventListener('keydown', e => {
-    if (document.getElementById('pinScreen').classList.contains('hidden')) return;
-    if (e.key >= '0' && e.key <= '9') pinPress(e.key);
-    if (e.key === 'Backspace') pinDel();
-  });
-})();
+  showPage('dashboard', document.querySelector('.nav-item[data-page="dashboard"]'));
+  // Try Firebase
+  const savedConfig = localStorage.getItem('baangenius_fb_config');
+  if (savedConfig) {
+    try {
+      const config = JSON.parse(savedConfig);
+      initFirebase(config);
+    } catch(e) { showSetup(); }
+  } else {
+    showSetup();
+  }
+}
 
-// ============================================================
-// HARDCODED FIREBASE CONFIG — เชื่อมต่ออัตโนมัติทุก browser/มือถือ
-// ============================================================
-const BAAN_GENIUS_CONFIG = {
-  apiKey: "AIzaSyDv5HjvCNdviISpj9tdAWCPUKEE7lReN7M",
-  authDomain: "the-speak-club.firebaseapp.com",
-  projectId: "the-speak-club",
-  storageBucket: "the-speak-club.firebasestorage.app",
-  messagingSenderId: "1068115178356",
-  appId: "1:1068115178356:web:98c3fde46e46eb46497221",
-  measurementId: "G-ETQ980X14Q"
-};
-
-// INIT — ใช้ config ที่ฝังไว้ เชื่อมต่ออัตโนมัติ
-// ============================================================
-(function init() {
-  showLoading('กำลังเชื่อมต่อ Firebase...');
-  // บันทึกลง localStorage ด้วยเผื่อ browser เก่าใช้
-  localStorage.setItem(FB_CONFIG_KEY, JSON.stringify(BAAN_GENIUS_CONFIG));
-  initFirebase(BAAN_GENIUS_CONFIG);
-})();
+// Start: show PIN screen, hide loading after brief delay
+window.addEventListener('load', function() {
+  setTimeout(() => {
+    hideLoading();
+  }, 300);
+});
 </script>
 </body>
 </html>
