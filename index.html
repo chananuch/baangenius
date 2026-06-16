@@ -2789,7 +2789,7 @@ function deleteAnnouncement(id) {
 // ============================================================
 // PIN + AUTH
 // ============================================================
-const PINS = { owner: '1234', assistant: '5678' };
+const PINS = { owner: '0405', assistant: '0202' };
 let currentRole = 'owner';
 const ASSISTANT_PAGES = new Set(['dashboard','students','attendance','enrollment','makeup','progress']);
 let pinEntry = '';
@@ -2818,7 +2818,7 @@ function checkPin() {
   if (pinEntry === PINS.owner) {
     currentRole = 'owner';
     document.body.classList.remove('assistant-mode');
-    document.getElementById('roleBadge').textContent = '👑 เจ้าของ';
+    document.getElementById('roleBadge').textContent = '👑 Director';
     document.getElementById('roleBadge').style.background = '#FFF3E0';
     document.getElementById('roleBadge').style.color = '#E65100';
     document.getElementById('pinScreen').classList.add('hidden');
