@@ -464,7 +464,7 @@
       <textarea id="fbConfigInput" rows="8" placeholder='วาง config ทั้งหมดที่ได้จาก Firebase ตรงนี้เลย เช่น:
 
 const firebaseConfig = {
-  apiKey: "AIzaSy...",
+  apiKey: "AIzaSyDv5HjvCNdviISpj9tdAWCPUKEE7lReN7M",
   authDomain: "my-project.firebaseapp.com",
   projectId: "my-project",
   storageBucket: "my-project.appspot.com",
@@ -2859,16 +2859,17 @@ function initApp() {
     document.querySelectorAll('[data-owner]').forEach(el=>el.style.display='none');
   }
   showPage('dashboard', document.querySelector('.nav-item[data-page="dashboard"]'));
-  // Try Firebase
-  const savedConfig = localStorage.getItem('baangenius_fb_config');
-  if (savedConfig) {
-    try {
-      const config = JSON.parse(savedConfig);
-      initFirebase(config);
-    } catch(e) { showSetup(); }
-  } else {
-    showSetup();
-  }
+  // Firebase config (hardcoded)
+  const config = {
+    apiKey: "AIzaSyDv5HjvCNdviISpj9tdAWCPUKEE7lReN7M",
+    authDomain: "the-speak-club.firebaseapp.com",
+    projectId: "the-speak-club",
+    storageBucket: "the-speak-club.firebasestorage.app",
+    messagingSenderId: "1068115178356",
+    appId: "1:1068115178356:web:98c3fde46e46eb46497221",
+    measurementId: "G-ETQ980X14Q"
+  };
+  initFirebase(config);
 }
 
 // Start: show PIN screen, hide loading after brief delay
