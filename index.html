@@ -102,7 +102,9 @@
     background: #fff; border-radius: 12px; padding: 20px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.06);
     display: flex; align-items: center; gap: 16px;
+    transition: transform 0.15s, box-shadow 0.15s;
   }
+  .stat-card:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(0,0,0,0.12); }
   .stat-icon { width:52px; height:52px; border-radius:12px; display:flex; align-items:center; justify-content:center; font-size:24px; flex-shrink:0; }
   .stat-icon.blue { background: #E3F2FD; }
   .stat-icon.green { background: #E8F5E9; }
@@ -983,23 +985,23 @@ function renderDashboard(el) {
 
   el.innerHTML = `
     <div class="stat-cards">
-      <div class="stat-card">
+      <div class="stat-card" onclick="showPage('students',null)" style="cursor:pointer" title="ดูรายชื่อนักเรียน">
         <div class="stat-icon blue">🎓</div>
         <div><div class="stat-num">${totalStudents}</div><div class="stat-label">นักเรียนทั้งหมด</div></div>
       </div>
-      <div class="stat-card">
+      <div class="stat-card" onclick="showPage('teachers',null)" style="cursor:pointer" title="ดูรายชื่ออาจารย์">
         <div class="stat-icon green">👩‍🏫</div>
         <div><div class="stat-num">${totalTeachers}</div><div class="stat-label">อาจารย์ทั้งหมด</div></div>
       </div>
-      <div class="stat-card">
+      <div class="stat-card" onclick="showPage('courses',null)" style="cursor:pointer" title="ดูคอร์สเรียน">
         <div class="stat-icon orange">📚</div>
         <div><div class="stat-num">${totalCourses}</div><div class="stat-label">คอร์สทั้งหมด</div></div>
       </div>
-      <div class="stat-card">
+      <div class="stat-card" onclick="showPage('finance',null)" style="cursor:pointer" title="ดูรายการค้างชำระ">
         <div class="stat-icon red">💰</div>
         <div><div class="stat-num">${unpaidCount}</div><div class="stat-label">ยังไม่ชำระเงิน</div></div>
       </div>
-      <div class="stat-card">
+      <div class="stat-card" onclick="showPage('announcements',null)" style="cursor:pointer" title="ดูประกาศ">
         <div class="stat-icon purple">📣</div>
         <div><div class="stat-num">${DB.announcements.length}</div><div class="stat-label">ประกาศล่าสุด</div></div>
       </div>
