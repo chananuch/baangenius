@@ -738,7 +738,39 @@ function setupRealtimeSync() {
         }
       });
 
-      if (hadGhost || installmentFixed || coursesSynced) { _skipNextSnapshot = true; saveDB(); }
+      // Migration: แก้ไข usedHours ให้ถูกต้องตามข้อมูลจริง (ทำครั้งเดียว)
+      let hoursFixed = false;
+      if (!DB._hoursMigrated) {
+        const correctHours = {
+          'อันนา': 22,
+          'โปรด': 8,
+          'อาลีฟ': 10,
+          'ณิชา': 10,
+          'ไทเกอร์': 14,
+          'ทิวทัศน์': 14,
+          'ณดา': 8,
+          'ซัน': 6,
+        };
+        (DB.enrollments||[]).filter(e=>e.status==='active').forEach(enr=>{
+          // ถ้ามีค่าที่กำหนดไว้ ใช้ค่านั้น
+          if (correctHours.hasOwnProperty(enr.studentName)) {
+            enr.usedHours = correctHours[enr.studentName];
+            hoursFixed = true;
+          } else {
+            // คนอื่น: คำนวณจากประวัติเช็คชื่อ × 2
+            const count = (DB.attendance||[]).filter(a =>
+              a.student === enr.studentName &&
+              a.course === enr.courseName &&
+              (a.status === 'present' || a.status === 'absent')
+            ).length;
+            if (count > 0) { enr.usedHours = count * 2; hoursFixed = true; }
+          }
+        });
+        DB._hoursMigrated = true;
+        hoursFixed = true;
+      }
+
+      if (hadGhost || installmentFixed || coursesSynced || hoursFixed) { _skipNextSnapshot = true; saveDB(); }
       nextId.students = Math.max(...DB.students.map(s=>s.id), 0)+1;
       nextId.teachers = Math.max(...DB.teachers.map(t=>t.id), 0)+1;
       if(!DB.salary) DB.salary = [];
@@ -1913,26 +1945,23 @@ function saveAttendance(course, date) {
   let deducted = 0;
   students.forEach(student => {
     const sid = student.id;
-    // Capture existing record BEFORE removing it
+    // สถานะเก่าก่อนแก้ไข
     const oldRecord = (DB.attendance||[]).find(a => a.student === student.name && a.course === course && a.date === date);
     const wasDeducted = oldRecord?.status === 'present' || oldRecord?.status === 'absent';
-    const nowDeducted = attendState[sid] === 'present' || attendState[sid] === 'absent';
+    const newStatus = attendState[sid] || null;
+    const nowDeducted = newStatus === 'present' || newStatus === 'absent';
+    // ปรับชั่วโมง: หัก 2 ถ้าเพิ่งเปลี่ยนมาหัก, คืน 2 ถ้าเปลี่ยนออกจากหัก
     const enr = (DB.enrollments||[]).find(e => e.studentName === student.name && e.courseName === course && e.status === 'active');
     if (enr) {
       if (nowDeducted && !wasDeducted) { enr.usedHours = (enr.usedHours||0) + 2; deducted++; }
       else if (!nowDeducted && wasDeducted) { enr.usedHours = Math.max(0, (enr.usedHours||0) - 2); }
     }
-    // Remove old record for this student+course+date
+    // อัพเดต attendance record
     DB.attendance = DB.attendance.filter(a => !(a.student === student.name && a.course === course && a.date === date));
-    if (!attendState[sid]) {
-      if (wasDeducted) {
-        const enr2 = (DB.enrollments||[]).find(e => e.studentName === student.name && e.courseName === course && e.status === 'active');
-        if (enr2) enr2.usedHours = Math.max(0, (enr2.usedHours||0) - 2);
-      }
-      return;
+    if (newStatus) {
+      const maxId = Math.max(...(DB.attendance||[]).map(a=>a.id||0), 0);
+      DB.attendance.push({ id: maxId+1, student: student.name, course, date, status: newStatus });
     }
-    const maxId = Math.max(...(DB.attendance||[]).map(a=>a.id||0), 0);
-    DB.attendance.push({ id: maxId+1, student: student.name, course, date, status: attendState[sid] });
   });
   saveDB();
   const statusEl = document.getElementById('saveStatus');
@@ -2841,21 +2870,45 @@ function updatePinDots() {
   }
 }
 
-function checkPin() {
-  if (pinEntry === PINS.owner) {
-    currentRole = 'owner';
+const SESSION_KEY = 'speakbright_session';
+const SESSION_DURATION = 30 * 60 * 1000; // 30 นาที
+
+function saveSession(role) {
+  sessionStorage.setItem(SESSION_KEY, JSON.stringify({ role, time: Date.now() }));
+}
+
+function loadSession() {
+  try {
+    const s = JSON.parse(sessionStorage.getItem(SESSION_KEY));
+    if (s && (Date.now() - s.time) < SESSION_DURATION) return s.role;
+  } catch(e) {}
+  return null;
+}
+
+function applyRole(role) {
+  currentRole = role;
+  if (role === 'owner') {
     document.body.classList.remove('assistant-mode');
     document.getElementById('roleBadge').textContent = '👑 Director';
     document.getElementById('roleBadge').style.background = '#FFF3E0';
     document.getElementById('roleBadge').style.color = '#E65100';
-    document.getElementById('pinScreen').classList.add('hidden');
-    initApp();
-  } else if (pinEntry === PINS.assistant) {
-    currentRole = 'assistant';
+  } else {
     document.body.classList.add('assistant-mode');
     document.getElementById('roleBadge').textContent = '👩‍🏫 ผู้ช่วย';
     document.getElementById('roleBadge').style.background = '#E3F2FD';
     document.getElementById('roleBadge').style.color = '#1565C0';
+  }
+}
+
+function checkPin() {
+  if (pinEntry === PINS.owner) {
+    applyRole('owner');
+    saveSession('owner');
+    document.getElementById('pinScreen').classList.add('hidden');
+    initApp();
+  } else if (pinEntry === PINS.assistant) {
+    applyRole('assistant');
+    saveSession('assistant');
     document.getElementById('pinScreen').classList.add('hidden');
     initApp();
   } else {
@@ -2870,6 +2923,7 @@ function checkPin() {
 }
 
 function logout() {
+  sessionStorage.removeItem(SESSION_KEY);
   pinEntry='';
   updatePinDots();
   document.getElementById('pinError').textContent='';
@@ -2899,10 +2953,18 @@ function initApp() {
   initFirebase(config);
 }
 
-// Start: show PIN screen, hide loading after brief delay
+// Start: check session, skip PIN if still valid
 window.addEventListener('load', function() {
   setTimeout(() => {
-    hideLoading();
+    const savedRole = loadSession();
+    if (savedRole) {
+      applyRole(savedRole);
+      saveSession(savedRole); // ต่ออายุ session
+      document.getElementById('pinScreen').classList.add('hidden');
+      initApp();
+    } else {
+      hideLoading();
+    }
   }, 300);
 });
 </script>
