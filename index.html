@@ -1156,6 +1156,8 @@ function stuAvatarHtml(s, size=36) {
   return `<div class="attend-avatar" style="width:${size}px;height:${size}px;font-size:${fs}px">${s ? s.nickname[0] : '?'}</div>`;
 }
 
+let _cropState = {};
+
 function uploadStudentPhoto(id) {
   const input = document.createElement('input');
   input.type = 'file';
@@ -1166,27 +1168,109 @@ function uploadStudentPhoto(id) {
     const reader = new FileReader();
     reader.onload = ev => {
       const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        const MAX = 120;
-        const ratio = Math.min(MAX/img.width, MAX/img.height);
-        canvas.width = img.width * ratio;
-        canvas.height = img.height * ratio;
-        canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
-        const s = DB.students.find(x=>x.id===id);
-        if (s) {
-          s.photo = canvas.toDataURL('image/jpeg', 0.75);
-          saveDB();
-          closeModal();
-          openStudentDetail(id);
-          showToast('อัพโหลดรูปสำเร็จ ✅');
-        }
-      };
+      img.onload = () => { openCropModal(id, img); };
       img.src = ev.target.result;
     };
     reader.readAsDataURL(file);
   };
   input.click();
+}
+
+function openCropModal(id, img) {
+  const SIZE = 280;
+  _cropState = { img, scale: 1, ox: 0, oy: 0, dragging: false, lastX: 0, lastY: 0 };
+  // Fit image to fill circle initially
+  const fitScale = Math.max(SIZE / img.width, SIZE / img.height);
+  _cropState.scale = fitScale;
+  _cropState.ox = (SIZE - img.width * fitScale) / 2;
+  _cropState.oy = (SIZE - img.height * fitScale) / 2;
+
+  const s = DB.students.find(x=>x.id===id);
+  openModal(`✂️ ครอปรูป — ${s?.nickname||''}`,
+    `<div style="display:flex;flex-direction:column;align-items:center;gap:12px">
+      <div style="position:relative;width:${SIZE}px;height:${SIZE}px;overflow:hidden;border-radius:50%;border:3px solid var(--primary);cursor:grab;touch-action:none" id="cropZone">
+        <canvas id="cropCanvas" width="${SIZE}" height="${SIZE}" style="display:block"></canvas>
+        <div style="position:absolute;inset:0;border-radius:50%;box-shadow:inset 0 0 0 2px rgba(33,150,243,0.5);pointer-events:none"></div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;width:${SIZE}px">
+        <span style="font-size:12px">🔍</span>
+        <input type="range" id="cropZoomSlider" min="0.5" max="5" step="0.05" value="${_cropState.scale.toFixed(2)}" style="flex:1" oninput="cropSetZoom(parseFloat(this.value))">
+        <span style="font-size:12px">🔎</span>
+      </div>
+      <div style="font-size:11px;color:var(--gray-500)">ลากเพื่อขยับ • เลื่อน slider เพื่อซูม</div>
+    </div>`,
+    `<button class="btn btn-outline" onclick="closeModal()">ยกเลิก</button>
+     <button class="btn btn-primary" onclick="saveCrop(${id})">✅ บันทึกรูป</button>`
+  );
+  requestAnimationFrame(() => {
+    cropDraw();
+    const zone = document.getElementById('cropZone');
+    if (!zone) return;
+    // Mouse
+    zone.addEventListener('mousedown', ev => { _cropState.dragging=true; _cropState.lastX=ev.clientX; _cropState.lastY=ev.clientY; zone.style.cursor='grabbing'; });
+    window.addEventListener('mousemove', ev => {
+      if (!_cropState.dragging) return;
+      _cropState.ox += ev.clientX - _cropState.lastX;
+      _cropState.oy += ev.clientY - _cropState.lastY;
+      _cropState.lastX = ev.clientX; _cropState.lastY = ev.clientY;
+      cropDraw();
+    });
+    window.addEventListener('mouseup', () => { _cropState.dragging=false; zone.style.cursor='grab'; });
+    // Touch
+    zone.addEventListener('touchstart', ev => { ev.preventDefault(); const t=ev.touches[0]; _cropState.dragging=true; _cropState.lastX=t.clientX; _cropState.lastY=t.clientY; }, {passive:false});
+    zone.addEventListener('touchmove', ev => { ev.preventDefault(); if(!_cropState.dragging) return; const t=ev.touches[0]; _cropState.ox+=t.clientX-_cropState.lastX; _cropState.oy+=t.clientY-_cropState.lastY; _cropState.lastX=t.clientX; _cropState.lastY=t.clientY; cropDraw(); }, {passive:false});
+    zone.addEventListener('touchend', () => { _cropState.dragging=false; });
+    // Pinch zoom
+    let lastPinchDist = null;
+    zone.addEventListener('touchstart', ev => { if(ev.touches.length===2) lastPinchDist=null; }, {passive:true});
+    zone.addEventListener('touchmove', ev => {
+      if(ev.touches.length===2) {
+        const dx=ev.touches[0].clientX-ev.touches[1].clientX, dy=ev.touches[0].clientY-ev.touches[1].clientY;
+        const dist=Math.hypot(dx,dy);
+        if(lastPinchDist) { _cropState.scale=Math.max(0.5,Math.min(5,_cropState.scale*(dist/lastPinchDist))); cropDraw(); const sl=document.getElementById('cropZoomSlider'); if(sl) sl.value=_cropState.scale; }
+        lastPinchDist=dist;
+      }
+    }, {passive:true});
+    // Scroll zoom
+    zone.addEventListener('wheel', ev => { ev.preventDefault(); _cropState.scale=Math.max(0.5,Math.min(5,_cropState.scale*(ev.deltaY<0?1.1:0.91))); cropDraw(); const sl=document.getElementById('cropZoomSlider'); if(sl) sl.value=_cropState.scale; }, {passive:false});
+  });
+}
+
+function cropDraw() {
+  const c = document.getElementById('cropCanvas');
+  if (!c) return;
+  const ctx = c.getContext('2d');
+  const {img, scale, ox, oy} = _cropState;
+  ctx.clearRect(0, 0, c.width, c.height);
+  ctx.drawImage(img, ox, oy, img.width * scale, img.height * scale);
+}
+
+function cropSetZoom(val) {
+  const SIZE = 280;
+  const cx = SIZE/2, cy = SIZE/2;
+  const oldScale = _cropState.scale;
+  _cropState.scale = val;
+  // Zoom around center
+  _cropState.ox = cx - (cx - _cropState.ox) * (val / oldScale);
+  _cropState.oy = cy - (cy - _cropState.oy) * (val / oldScale);
+  cropDraw();
+}
+
+function saveCrop(id) {
+  const SIZE = 280; const OUT = 300;
+  const c = document.getElementById('cropCanvas');
+  const out = document.createElement('canvas');
+  out.width = OUT; out.height = OUT;
+  const ctx = out.getContext('2d');
+  const {img, scale, ox, oy} = _cropState;
+  const ratio = OUT / SIZE;
+  ctx.drawImage(img, ox*ratio, oy*ratio, img.width*scale*ratio, img.height*scale*ratio);
+  const s = DB.students.find(x=>x.id===id);
+  if (s) {
+    s.photo = out.toDataURL('image/jpeg', 0.88);
+    saveDB(); closeModal(); openStudentDetail(id);
+    showToast('บันทึกรูปสำเร็จ ✅');
+  }
 }
 
 function viewStudentPhoto(id) {
