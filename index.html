@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>SpeakBright - ระบบจัดการโรงเรียน</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 <style>
@@ -212,6 +213,18 @@
 
   /* SIDEBAR OVERLAY for mobile */
   .sidebar-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.4); z-index:99; }
+
+  @media print {
+    .sidebar, .topbar, .sidebar-overlay, .toast, .modal-overlay, .pin-screen, .loading-overlay { display:none!important; }
+    .main { margin-left:0!important; }
+    .content { padding:8px!important; }
+    .btn { display:none!important; }
+    table { font-size:12px; }
+    th, td { padding:6px 10px; }
+    .no-print { display:none!important; }
+    .print-only { display:block!important; }
+  }
+  .print-only { display:none; }
 
   /* EMPTY STATE */
   .empty { text-align:center; padding: 40px 20px; color: var(--gray-500); }
@@ -2649,6 +2662,7 @@ function renderFinance(el) {
                 <td>${statusBadge(i.status)}</td>
                 <td style="white-space:nowrap">
                   ${i.status!=='paid'?`<button class="btn btn-sm owner-only" style="background:#E8F5E9;color:var(--success);border:none" onclick="markPaid(${i.id})">✅ รับเงิน</button>`:''}
+                  <button class="btn btn-sm" style="background:#E3F2FD;color:var(--primary);border:none" onclick="printInvoiceReceipt(${i.id})" title="พิมพ์ใบเสร็จ">🧾</button>
                   <button class="btn btn-icon btn-sm owner-only" onclick="deleteInvoice(${i.id})" style="color:var(--danger)">🗑️</button>
                 </td>
               </tr>`).join('')}
@@ -2664,7 +2678,11 @@ function renderFinance(el) {
         <div style="font-size:13px;color:var(--gray-500)">รายได้เดือนนี้</div>
         <div style="font-size:24px;font-weight:800;color:var(--primary)">฿${DB.invoices.filter(i=>i.status==='paid').reduce((s,i)=>s+(i.amount||0),0).toLocaleString()}</div>
       </div>
-      <button class="btn btn-primary owner-only" onclick="openAddInvoice()">+ สร้างใบแจ้งหนี้</button>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-outline btn-sm" onclick="exportFinanceExcel()">📊 Excel</button>
+        <button class="btn btn-outline btn-sm" onclick="printFinanceTable()">🖨️ พิมพ์</button>
+        <button class="btn btn-primary owner-only" onclick="openAddInvoice()">+ สร้างใบแจ้งหนี้</button>
+      </div>
     </div>
     <div class="tabs" id="financeTabs">
       ${statusTabs.map(t=>`<button class="tab-btn ${t==='ทั้งหมด'?'active':''}" onclick="switchFinanceTab('${t}',this)">${t==='ทั้งหมด'?'ทั้งหมด':statusLabel[t]}</button>`).join('')}
@@ -2679,7 +2697,6 @@ function switchFinanceTab(tab, el) {
   document.querySelectorAll('#financeTabs .tab-btn').forEach(b=>b.classList.remove('active'));
   el.classList.add('active');
   const filtered = tab==='ทั้งหมด' ? DB.invoices : DB.invoices.filter(i=>i.status===tab);
-  const statusLabel = {unpaid:'ค้างชำระ',overdue:'เกินกำหนด',paid:'ชำระแล้ว'};
   document.getElementById('invoiceTableWrap').innerHTML = `
     <div class="table-wrap">
       <table>
@@ -2695,6 +2712,7 @@ function switchFinanceTab(tab, el) {
               <td>${statusBadge(i.status)}</td>
               <td style="white-space:nowrap">
                 ${i.status!=='paid'?`<button class="btn btn-sm owner-only" style="background:#E8F5E9;color:var(--success);border:none" onclick="markPaid(${i.id})">✅ รับเงิน</button>`:''}
+                <button class="btn btn-sm" style="background:#E3F2FD;color:var(--primary);border:none" onclick="printInvoiceReceipt(${i.id})" title="พิมพ์ใบเสร็จ">🧾</button>
                 <button class="btn btn-icon btn-sm owner-only" onclick="deleteInvoice(${i.id})" style="color:var(--danger)">🗑️</button>
               </td>
             </tr>`).join('')}
@@ -2715,6 +2733,7 @@ function markPaid(id) {
   const inv = DB.invoices.find(i=>i.id===id);
   if (!inv) return;
   inv.status = 'paid';
+  inv.paidDate = new Date().toLocaleDateString('th-TH', {year:'numeric',month:'long',day:'numeric'});
   saveDB();
   renderFinance(document.getElementById('mainContent'));
   showToast('บันทึกการรับเงินสำเร็จ ✅');
@@ -2782,7 +2801,11 @@ function renderSalary(el) {
     <div class="card">
       <div class="card-header">
         <span class="card-title">ค่าตอบแทน Teachers</span>
-        <button class="btn btn-primary btn-sm owner-only" onclick="openAddSalary()">+ เพิ่มรายการ</button>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-outline btn-sm" onclick="exportSalaryExcel()">📊 Excel</button>
+          <button class="btn btn-outline btn-sm" onclick="printSalaryTable()">🖨️ พิมพ์</button>
+          <button class="btn btn-primary btn-sm owner-only" onclick="openAddSalary()">+ เพิ่มรายการ</button>
+        </div>
       </div>
       <div class="table-wrap">
         <table>
@@ -2798,6 +2821,7 @@ function renderSalary(el) {
                 <td>${s.paid?'<span class="badge badge-success">จ่ายแล้ว</span>':'<span class="badge badge-warning">ยังไม่จ่าย</span>'}</td>
                 <td style="white-space:nowrap">
                   ${!s.paid?`<button class="btn btn-sm owner-only" style="background:#E8F5E9;color:var(--success);border:none" onclick="markSalaryPaid(${s.id})">✅ จ่ายแล้ว</button>`:''}
+                  <button class="btn btn-sm" style="background:#E3F2FD;color:var(--primary);border:none" onclick="printSalarySlip(${s.id})" title="พิมพ์ใบเสร็จ">🧾</button>
                   <button class="btn btn-icon btn-sm owner-only" onclick="deleteSalary(${s.id})" style="color:var(--danger)">🗑️</button>
                 </td>
               </tr>`).join('')}
@@ -2810,7 +2834,7 @@ function renderSalary(el) {
 
 function markSalaryPaid(id) {
   const s = DB.salary.find(x=>x.id===id);
-  if(s) s.paid=true;
+  if(s) { s.paid=true; s.paidDate=new Date().toLocaleDateString('th-TH',{year:'numeric',month:'long',day:'numeric'}); }
   saveDB();
   renderSalary(document.getElementById('mainContent'));
   showToast('บันทึกการจ่ายสำเร็จ ✅');
@@ -2861,6 +2885,236 @@ function saveSalary() {
   closeModal();
   renderSalary(document.getElementById('mainContent'));
   showToast('บันทึกสำเร็จ');
+}
+
+// ============================================================
+// EXPORT & PRINT FUNCTIONS
+// ============================================================
+function exportToExcel(rows, filename) {
+  if(typeof XLSX === 'undefined') { showToast('กำลังโหลด...'); return; }
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'ข้อมูล');
+  // Auto column width
+  const cols = Object.keys(rows[0]||{}).map(k=>({wch: Math.max(k.length*2, 14)}));
+  ws['!cols'] = cols;
+  XLSX.writeFile(wb, filename);
+  showToast('ดาวน์โหลด Excel สำเร็จ ✅');
+}
+
+function exportFinanceExcel() {
+  const statusLabel = {paid:'ชำระแล้ว', unpaid:'ค้างชำระ', overdue:'เกินกำหนด'};
+  const rows = DB.invoices.map(i=>({
+    'นักเรียน': i.student,
+    'คอร์ส': i.course,
+    'เดือน': i.month,
+    'จำนวนเงิน (บาท)': i.amount||0,
+    'ครบกำหนด': i.due,
+    'สถานะ': statusLabel[i.status]||i.status,
+    'วันที่ชำระ': i.paidDate||''
+  }));
+  exportToExcel(rows, 'SpeakBright_ใบแจ้งหนี้.xlsx');
+}
+
+function exportSalaryExcel() {
+  const rows = (DB.salary||[]).map(s=>({
+    'Teacher': s.teacher,
+    'เดือน': s.month,
+    'เงินเดือน (บาท)': s.base||0,
+    'โบนัส (บาท)': s.bonus||0,
+    'รวม (บาท)': (s.base||0)+(s.bonus||0),
+    'สถานะ': s.paid?'จ่ายแล้ว':'ยังไม่จ่าย',
+    'วันที่จ่าย': s.paidDate||''
+  }));
+  exportToExcel(rows, 'SpeakBright_ค่าตอบแทน.xlsx');
+}
+
+function openPrintWindow(html) {
+  const w = window.open('', '_blank', 'width=750,height=900');
+  w.document.write(html);
+  w.document.close();
+  w.focus();
+  setTimeout(()=>w.print(), 600);
+}
+
+function printFinanceTable() {
+  const statusLabel = {paid:'ชำระแล้ว', unpaid:'ค้างชำระ', overdue:'เกินกำหนด'};
+  const rows = DB.invoices.map(i=>`<tr>
+    <td>${i.student}</td><td>${i.course}</td><td>${i.month}</td>
+    <td style="text-align:right">฿${(i.amount||0).toLocaleString()}</td>
+    <td>${i.due}</td><td>${statusLabel[i.status]||i.status}</td>
+  </tr>`).join('');
+  const total = DB.invoices.filter(i=>i.status==='paid').reduce((s,i)=>s+(i.amount||0),0);
+  openPrintWindow(`<!DOCTYPE html><html><head><meta charset="UTF-8">
+  <title>ใบแจ้งหนี้ — SpeakBright</title>
+  <style>
+    body{font-family:sans-serif;padding:24px;font-size:13px;color:#111}
+    h2{margin-bottom:4px;font-size:18px} .sub{color:#666;font-size:12px;margin-bottom:20px}
+    table{width:100%;border-collapse:collapse;margin-top:16px}
+    th{background:#1565C0;color:#fff;padding:8px 10px;text-align:left;font-size:12px}
+    td{padding:7px 10px;border-bottom:1px solid #e0e0e0}
+    tr:last-child td{border-bottom:none}
+    .footer{margin-top:20px;text-align:right;font-weight:700;font-size:15px}
+    @media print{button{display:none}}
+  </style></head><body>
+  <h2>🏫 SpeakBright Learning Center</h2>
+  <div class="sub">รายการใบแจ้งหนี้ — พิมพ์วันที่ ${new Date().toLocaleDateString('th-TH',{year:'numeric',month:'long',day:'numeric'})}</div>
+  <table>
+    <thead><tr><th>นักเรียน</th><th>คอร์ส</th><th>เดือน</th><th>จำนวนเงิน</th><th>ครบกำหนด</th><th>สถานะ</th></tr></thead>
+    <tbody>${rows}</tbody>
+  </table>
+  <div class="footer">รายได้รวม (ชำระแล้ว): ฿${total.toLocaleString()}</div>
+  </body></html>`);
+}
+
+function printSalaryTable() {
+  const rows = (DB.salary||[]).map(s=>`<tr>
+    <td>${s.teacher}</td><td>${s.month}</td>
+    <td style="text-align:right">฿${(s.base||0).toLocaleString()}</td>
+    <td style="text-align:right">${s.bonus?'฿'+s.bonus.toLocaleString():'-'}</td>
+    <td style="text-align:right;font-weight:700">฿${((s.base||0)+(s.bonus||0)).toLocaleString()}</td>
+    <td>${s.paid?'จ่ายแล้ว':'ยังไม่จ่าย'}</td>
+  </tr>`).join('');
+  const total = (DB.salary||[]).reduce((s,x)=>s+(x.base||0)+(x.bonus||0),0);
+  openPrintWindow(`<!DOCTYPE html><html><head><meta charset="UTF-8">
+  <title>ค่าตอบแทน Teachers — SpeakBright</title>
+  <style>
+    body{font-family:sans-serif;padding:24px;font-size:13px;color:#111}
+    h2{margin-bottom:4px;font-size:18px} .sub{color:#666;font-size:12px;margin-bottom:20px}
+    table{width:100%;border-collapse:collapse;margin-top:16px}
+    th{background:#1565C0;color:#fff;padding:8px 10px;text-align:left;font-size:12px}
+    td{padding:7px 10px;border-bottom:1px solid #e0e0e0}
+    tr:last-child td{border-bottom:none}
+    .footer{margin-top:20px;text-align:right;font-weight:700;font-size:15px}
+  </style></head><body>
+  <h2>🏫 SpeakBright Learning Center</h2>
+  <div class="sub">รายการค่าตอบแทน Teachers — พิมพ์วันที่ ${new Date().toLocaleDateString('th-TH',{year:'numeric',month:'long',day:'numeric'})}</div>
+  <table>
+    <thead><tr><th>Teacher</th><th>เดือน</th><th>เงินเดือน</th><th>โบนัส</th><th>รวม</th><th>สถานะ</th></tr></thead>
+    <tbody>${rows}</tbody>
+  </table>
+  <div class="footer">รวมทั้งสิ้น: ฿${total.toLocaleString()}</div>
+  </body></html>`);
+}
+
+function printInvoiceReceipt(id) {
+  const inv = DB.invoices.find(i=>i.id===id);
+  if(!inv) return;
+  const stu = DB.students.find(s=>s.name===inv.student);
+  const guardian = stu?.guardian || '';
+  const receiptNo = String(inv.id).padStart(4,'0');
+  const today = new Date().toLocaleDateString('th-TH',{year:'numeric',month:'long',day:'numeric'});
+  const statusTH = inv.status==='paid'?'ชำระแล้ว':inv.status==='unpaid'?'ค้างชำระ':'เกินกำหนด';
+  openPrintWindow(`<!DOCTYPE html><html><head><meta charset="UTF-8">
+  <title>ใบเสร็จรับเงิน — SpeakBright</title>
+  <style>
+    body{font-family:sans-serif;padding:40px;font-size:13px;color:#111;max-width:580px;margin:auto}
+    .header{text-align:center;margin-bottom:24px;border-bottom:2px solid #1565C0;padding-bottom:16px}
+    .school{font-size:22px;font-weight:800;color:#1565C0;margin-bottom:4px}
+    .school-sub{font-size:12px;color:#666}
+    .receipt-title{font-size:17px;font-weight:700;margin:20px 0 16px;text-align:center;letter-spacing:2px}
+    .receipt-no{text-align:right;font-size:12px;color:#666;margin-bottom:16px}
+    .info-row{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px dotted #ddd;font-size:13px}
+    .info-label{color:#666;min-width:130px}
+    .info-val{font-weight:600;text-align:right}
+    .amount-box{margin:24px 0;background:#E3F2FD;border-radius:12px;padding:20px;text-align:center}
+    .amount-label{font-size:12px;color:#666;margin-bottom:8px}
+    .amount-val{font-size:32px;font-weight:800;color:#1565C0}
+    .status-badge{display:inline-block;padding:4px 16px;border-radius:20px;font-size:12px;font-weight:700;
+      background:${inv.status==='paid'?'#E8F5E9':'#FFF3E0'};color:${inv.status==='paid'?'#2E7D32':'#E65100'}}
+    .sig-row{display:flex;justify-content:space-between;margin-top:48px}
+    .sig-box{text-align:center;flex:1}
+    .sig-line{border-top:1px solid #111;margin:8px 20px 0;padding-top:6px;font-size:12px;color:#666}
+    .footer-note{text-align:center;margin-top:24px;font-size:11px;color:#999}
+    @media print{button{display:none}}
+  </style></head><body>
+  <div class="header">
+    <div class="school">🏫 SpeakBright Learning Center</div>
+    <div class="school-sub">ศูนย์การเรียนรู้ SpeakBright</div>
+  </div>
+  <div class="receipt-title">ใบเสร็จรับเงิน / RECEIPT</div>
+  <div class="receipt-no">เลขที่ใบเสร็จ: SB-${receiptNo}</div>
+  <div class="info-row"><span class="info-label">ชื่อนักเรียน</span><span class="info-val">${inv.student}</span></div>
+  ${guardian?`<div class="info-row"><span class="info-label">ผู้ปกครอง</span><span class="info-val">${guardian}</span></div>`:''}
+  <div class="info-row"><span class="info-label">คอร์สเรียน</span><span class="info-val">${inv.course}</span></div>
+  <div class="info-row"><span class="info-label">เดือน</span><span class="info-val">${inv.month}</span></div>
+  <div class="info-row"><span class="info-label">ครบกำหนดชำระ</span><span class="info-val">${inv.due}</span></div>
+  <div class="info-row"><span class="info-label">สถานะ</span><span class="info-val"><span class="status-badge">${statusTH}</span></span></div>
+  ${inv.paidDate?`<div class="info-row"><span class="info-label">วันที่ชำระ</span><span class="info-val">${inv.paidDate}</span></div>`:''}
+  <div class="amount-box">
+    <div class="amount-label">จำนวนเงิน</div>
+    <div class="amount-val">฿${(inv.amount||0).toLocaleString()}</div>
+  </div>
+  <div class="sig-row">
+    <div class="sig-box">
+      <div style="height:50px"></div>
+      <div class="sig-line">ผู้ปกครอง / นักเรียน</div>
+    </div>
+    <div class="sig-box">
+      <div style="height:50px"></div>
+      <div class="sig-line">ผู้รับเงิน</div>
+    </div>
+  </div>
+  <div class="footer-note">พิมพ์วันที่ ${today} • SpeakBright Learning Center</div>
+  </body></html>`);
+}
+
+function printSalarySlip(id) {
+  const sal = (DB.salary||[]).find(s=>s.id===id);
+  if(!sal) return;
+  const slipNo = String(sal.id).padStart(4,'0');
+  const today = new Date().toLocaleDateString('th-TH',{year:'numeric',month:'long',day:'numeric'});
+  const total = (sal.base||0)+(sal.bonus||0);
+  openPrintWindow(`<!DOCTYPE html><html><head><meta charset="UTF-8">
+  <title>ใบเสร็จค่าตอบแทน — SpeakBright</title>
+  <style>
+    body{font-family:sans-serif;padding:40px;font-size:13px;color:#111;max-width:580px;margin:auto}
+    .header{text-align:center;margin-bottom:24px;border-bottom:2px solid #1565C0;padding-bottom:16px}
+    .school{font-size:22px;font-weight:800;color:#1565C0;margin-bottom:4px}
+    .school-sub{font-size:12px;color:#666}
+    .slip-title{font-size:17px;font-weight:700;margin:20px 0 16px;text-align:center;letter-spacing:2px}
+    .slip-no{text-align:right;font-size:12px;color:#666;margin-bottom:16px}
+    .info-row{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px dotted #ddd;font-size:13px}
+    .info-label{color:#666;min-width:130px}
+    .info-val{font-weight:600;text-align:right}
+    .breakdown{margin:20px 0;border:1px solid #e0e0e0;border-radius:8px;overflow:hidden}
+    .breakdown-row{display:flex;justify-content:space-between;padding:10px 16px;border-bottom:1px solid #e0e0e0;font-size:13px}
+    .breakdown-row:last-child{border-bottom:none;background:#E3F2FD;font-weight:800;font-size:15px;color:#1565C0}
+    .status-badge{display:inline-block;padding:4px 16px;border-radius:20px;font-size:12px;font-weight:700;
+      background:${sal.paid?'#E8F5E9':'#FFF3E0'};color:${sal.paid?'#2E7D32':'#E65100'}}
+    .sig-row{display:flex;justify-content:space-between;margin-top:48px}
+    .sig-box{text-align:center;flex:1}
+    .sig-line{border-top:1px solid #111;margin:8px 20px 0;padding-top:6px;font-size:12px;color:#666}
+    .footer-note{text-align:center;margin-top:24px;font-size:11px;color:#999}
+    @media print{button{display:none}}
+  </style></head><body>
+  <div class="header">
+    <div class="school">🏫 SpeakBright Learning Center</div>
+    <div class="school-sub">ศูนย์การเรียนรู้ SpeakBright</div>
+  </div>
+  <div class="slip-title">ใบรับรองค่าตอบแทน / SALARY SLIP</div>
+  <div class="slip-no">เลขที่: SB-SAL-${slipNo}</div>
+  <div class="info-row"><span class="info-label">ชื่อครู</span><span class="info-val">${sal.teacher}</span></div>
+  <div class="info-row"><span class="info-label">เดือน</span><span class="info-val">${sal.month}</span></div>
+  <div class="info-row"><span class="info-label">สถานะ</span><span class="info-val"><span class="status-badge">${sal.paid?'จ่ายแล้ว':'ยังไม่จ่าย'}</span></span></div>
+  ${sal.paidDate?`<div class="info-row"><span class="info-label">วันที่จ่าย</span><span class="info-val">${sal.paidDate}</span></div>`:''}
+  <div class="breakdown">
+    <div class="breakdown-row"><span>เงินเดือน</span><span>฿${(sal.base||0).toLocaleString()}</span></div>
+    <div class="breakdown-row"><span>โบนัส</span><span>${sal.bonus?'฿'+sal.bonus.toLocaleString():'-'}</span></div>
+    <div class="breakdown-row"><span>รวมทั้งสิ้น</span><span>฿${total.toLocaleString()}</span></div>
+  </div>
+  <div class="sig-row">
+    <div class="sig-box">
+      <div style="height:50px"></div>
+      <div class="sig-line">ผู้รับเงิน (${sal.teacher})</div>
+    </div>
+    <div class="sig-box">
+      <div style="height:50px"></div>
+      <div class="sig-line">ผู้จ่ายเงิน</div>
+    </div>
+  </div>
+  <div class="footer-note">พิมพ์วันที่ ${today} • SpeakBright Learning Center</div>
+  </body></html>`);
 }
 
 // ============================================================
