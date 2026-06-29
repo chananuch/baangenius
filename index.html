@@ -6,6 +6,8 @@
 <title>SpeakBright - ระบบจัดการโรงเรียน</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 <style>
@@ -1309,6 +1311,9 @@ function renderStudents(el) {
         <span class="search-icon">🔍</span>
         <input type="text" placeholder="ค้นหานักเรียน..." id="studentSearch" oninput="filterStudents()">
       </div>
+      <button class="btn btn-outline btn-sm" onclick="exportStudentsExcel()">📊 Excel</button>
+      <button class="btn btn-outline btn-sm" onclick="exportStudentsPDF()">📄 PDF</button>
+      <button class="btn btn-outline btn-sm" onclick="printStudentsTable()">🖨️ พิมพ์</button>
       <button class="btn btn-primary owner-only" onclick="openAddStudent()">+ เพิ่มนักเรียน</button>
     </div>
     <div class="card">
@@ -2680,6 +2685,7 @@ function renderFinance(el) {
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn btn-outline btn-sm" onclick="exportFinanceExcel()">📊 Excel</button>
+        <button class="btn btn-outline btn-sm" onclick="exportFinancePDF()">📄 PDF</button>
         <button class="btn btn-outline btn-sm" onclick="printFinanceTable()">🖨️ พิมพ์</button>
         <button class="btn btn-primary owner-only" onclick="openAddInvoice()">+ สร้างใบแจ้งหนี้</button>
       </div>
@@ -2803,6 +2809,7 @@ function renderSalary(el) {
         <span class="card-title">ค่าตอบแทน Teachers</span>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
           <button class="btn btn-outline btn-sm" onclick="exportSalaryExcel()">📊 Excel</button>
+          <button class="btn btn-outline btn-sm" onclick="exportSalaryPDF()">📄 PDF</button>
           <button class="btn btn-outline btn-sm" onclick="printSalaryTable()">🖨️ พิมพ์</button>
           <button class="btn btn-primary btn-sm owner-only" onclick="openAddSalary()">+ เพิ่มรายการ</button>
         </div>
@@ -2902,6 +2909,74 @@ function exportToExcel(rows, filename) {
   showToast('ดาวน์โหลด Excel สำเร็จ ✅');
 }
 
+function exportStudentsExcel() {
+  const active = DB.students.filter(s=>s.status==='active');
+  const rows = active.map(s=>{
+    const balance = getStudentBalance(s.name);
+    const enrs = DB.enrollments.filter(e=>e.studentName===s.name&&e.status==='active');
+    const hoursLeft = enrs.reduce((sum,e)=>sum+Math.max(0,(e.totalHours||0)-(e.usedHours||0)),0);
+    return {
+      'ชื่อ-สกุล': s.name,
+      'ชื่อเล่น': s.nickname,
+      'คอร์ส': s.courses.join(', '),
+      'ผู้ปกครอง': s.parent||'',
+      'เบอร์โทร': s.phone||'',
+      'ชั่วโมงคงเหลือ': hoursLeft,
+      'ยอดค้างชำระ (บาท)': balance,
+    };
+  });
+  exportToExcel(rows, 'SpeakBright_นักเรียน.xlsx');
+}
+
+function printStudentsTable() {
+  const statusLabel = {paid:'ชำระแล้ว', unpaid:'ค้างชำระ', overdue:'เกินกำหนด'};
+  const active = DB.students.filter(s=>s.status==='active');
+  const rows = active.map((s,i)=>{
+    const balance = getStudentBalance(s.name);
+    const enrs = DB.enrollments.filter(e=>e.studentName===s.name&&e.status==='active');
+    const hoursLeft = enrs.reduce((sum,e)=>sum+Math.max(0,(e.totalHours||0)-(e.usedHours||0)),0);
+    return `<tr>
+      <td>${i+1}</td>
+      <td><strong>${s.name}</strong></td>
+      <td>${s.nickname}</td>
+      <td>${s.courses.join(', ')}</td>
+      <td>${s.parent||'-'}</td>
+      <td>${s.phone||'-'}</td>
+      <td style="text-align:center">${hoursLeft} ชม.</td>
+      <td style="text-align:right;color:${balance>0?'#E65100':'#2E7D32'};font-weight:700">${balance>0?'฿'+balance.toLocaleString():'ชำระแล้ว'}</td>
+    </tr>`;
+  }).join('');
+  const today = new Date().toLocaleDateString('th-TH',{year:'numeric',month:'long',day:'numeric'});
+  openPrintWindow(`<!DOCTYPE html><html><head><meta charset="UTF-8">
+  <title>รายชื่อนักเรียน — SpeakBright</title>
+  <style>
+    body{font-family:sans-serif;padding:28px;font-size:12px;color:#111}
+    .header{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:20px;border-bottom:2px solid #1565C0;padding-bottom:12px}
+    .school{font-size:20px;font-weight:800;color:#1565C0}
+    .meta{text-align:right;font-size:11px;color:#666;line-height:1.6}
+    table{width:100%;border-collapse:collapse;margin-top:4px}
+    th{background:#1565C0;color:#fff;padding:7px 10px;text-align:left;font-size:11px}
+    td{padding:7px 10px;border-bottom:1px solid #e0e0e0;vertical-align:middle}
+    tr:nth-child(even) td{background:#f5f8ff}
+    tr:last-child td{border-bottom:none}
+    .footer{margin-top:16px;font-size:11px;color:#999;text-align:right}
+    @media print{button{display:none}}
+  </style></head><body>
+  <div class="header">
+    <div>
+      <div class="school">🏫 SpeakBright Learning Center</div>
+      <div style="font-size:14px;font-weight:700;margin-top:4px">รายชื่อนักเรียน</div>
+    </div>
+    <div class="meta">พิมพ์วันที่: ${today}<br>จำนวนนักเรียน: ${active.length} คน</div>
+  </div>
+  <table>
+    <thead><tr><th>#</th><th>ชื่อ-สกุล</th><th>ชื่อเล่น</th><th>คอร์ส</th><th>ผู้ปกครอง</th><th>เบอร์โทร</th><th>ชม.เหลือ</th><th>ยอดค้าง</th></tr></thead>
+    <tbody>${rows}</tbody>
+  </table>
+  <div class="footer">SpeakBright Learning Center • รายงานนักเรียน ${today}</div>
+  </body></html>`);
+}
+
 function exportFinanceExcel() {
   const statusLabel = {paid:'ชำระแล้ว', unpaid:'ค้างชำระ', overdue:'เกินกำหนด'};
   const rows = DB.invoices.map(i=>({
@@ -2927,6 +3002,204 @@ function exportSalaryExcel() {
     'วันที่จ่าย': s.paidDate||''
   }));
   exportToExcel(rows, 'SpeakBright_ค่าตอบแทน.xlsx');
+}
+
+// ---- PDF helpers ----
+function pdfHeader(doc, title, subtitle) {
+  const pw = doc.internal.pageSize.getWidth();
+  // Blue header bar
+  doc.setFillColor(21, 101, 192);
+  doc.rect(0, 0, pw, 28, 'F');
+  // School name
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(16);
+  doc.setTextColor(255, 255, 255);
+  doc.text('SpeakBright Learning Center', 14, 11);
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'normal');
+  doc.text(subtitle, 14, 19);
+  // Date top-right
+  const today = new Date().toLocaleDateString('th-TH',{year:'numeric',month:'long',day:'numeric'});
+  doc.setFontSize(8);
+  doc.text(today, pw - 14, 19, {align:'right'});
+  // Title below header
+  doc.setTextColor(21, 101, 192);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(13);
+  doc.text(title, 14, 40);
+  doc.setTextColor(50, 50, 50);
+}
+
+function pdfFooter(doc) {
+  const pw = doc.internal.pageSize.getWidth();
+  const ph = doc.internal.pageSize.getHeight();
+  doc.setFillColor(240, 244, 255);
+  doc.rect(0, ph-12, pw, 12, 'F');
+  doc.setFontSize(7);
+  doc.setTextColor(120,120,120);
+  doc.setFont('helvetica','normal');
+  doc.text('SpeakBright Learning Center', 14, ph-4);
+  doc.text(`หน้า ${doc.internal.getCurrentPageInfo().pageNumber}`, pw-14, ph-4, {align:'right'});
+}
+
+function exportStudentsPDF() {
+  if(typeof jspdf === 'undefined' && typeof window.jspdf === 'undefined') { showToast('กำลังโหลด...'); return; }
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation:'landscape', unit:'mm', format:'a4' });
+  const pw = doc.internal.pageSize.getWidth();
+
+  pdfHeader(doc, 'รายชื่อนักเรียน', 'Student List');
+
+  const active = DB.students.filter(s=>s.status==='active');
+  const body = active.map((s,i)=>{
+    const balance = getStudentBalance(s.name);
+    const enrs = DB.enrollments.filter(e=>e.studentName===s.name&&e.status==='active');
+    const hoursLeft = enrs.reduce((sum,e)=>sum+Math.max(0,(e.totalHours||0)-(e.usedHours||0)),0);
+    return [
+      i+1,
+      s.name,
+      s.nickname,
+      s.courses.join(', '),
+      s.parent||'-',
+      s.phone||'-',
+      hoursLeft+' ชม.',
+      balance>0 ? '฿'+balance.toLocaleString() : 'ชำระแล้ว'
+    ];
+  });
+
+  doc.autoTable({
+    startY: 46,
+    head: [['#','ชื่อ-สกุล','ชื่อเล่น','คอร์ส','ผู้ปกครอง','เบอร์โทร','ชม.เหลือ','ยอดค้าง']],
+    body,
+    theme: 'grid',
+    headStyles: { fillColor:[21,101,192], textColor:255, fontStyle:'bold', fontSize:9 },
+    bodyStyles: { fontSize:9, textColor:40 },
+    alternateRowStyles: { fillColor:[240,246,255] },
+    columnStyles: {
+      0:{cellWidth:10,halign:'center'},
+      6:{halign:'center'},
+      7:{halign:'right'}
+    },
+    margin:{left:14,right:14},
+    didDrawPage: ()=>pdfFooter(doc)
+  });
+
+  // Summary box
+  const finalY = doc.lastAutoTable.finalY + 8;
+  doc.setFillColor(232,245,233);
+  doc.roundedRect(14, finalY, 80, 14, 2, 2, 'F');
+  doc.setFont('helvetica','bold');
+  doc.setFontSize(9);
+  doc.setTextColor(46,125,50);
+  doc.text(`จำนวนนักเรียนทั้งหมด: ${active.length} คน`, 20, finalY+6);
+  const totalOwed = active.reduce((s,x)=>s+getStudentBalance(x.name),0);
+  if(totalOwed>0){
+    doc.setFillColor(255,243,224);
+    doc.roundedRect(100, finalY, 80, 14, 2, 2, 'F');
+    doc.setTextColor(230,81,0);
+    doc.text(`ยอดค้างชำระรวม: ฿${totalOwed.toLocaleString()}`, 106, finalY+6);
+  }
+  doc.setTextColor(50,50,50);
+
+  doc.save('SpeakBright_นักเรียน.pdf');
+  showToast('ดาวน์โหลด PDF สำเร็จ ✅');
+}
+
+function exportFinancePDF() {
+  if(typeof window.jspdf === 'undefined') { showToast('กำลังโหลด...'); return; }
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit:'mm', format:'a4' });
+  const pw = doc.internal.pageSize.getWidth();
+  const statusTH = {paid:'ชำระแล้ว',unpaid:'ค้างชำระ',overdue:'เกินกำหนด'};
+
+  pdfHeader(doc, 'ใบแจ้งหนี้/การเงิน', 'Invoice & Finance Report');
+
+  const body = DB.invoices.map((i,idx)=>[
+    idx+1, i.student, i.course, i.month,
+    '฿'+((i.amount||0).toLocaleString()),
+    i.due,
+    statusTH[i.status]||i.status,
+    i.paidDate||'-'
+  ]);
+
+  doc.autoTable({
+    startY: 46,
+    head: [['#','นักเรียน','คอร์ส','เดือน','จำนวนเงิน','ครบกำหนด','สถานะ','วันที่ชำระ']],
+    body,
+    theme: 'grid',
+    headStyles:{fillColor:[21,101,192],textColor:255,fontStyle:'bold',fontSize:9},
+    bodyStyles:{fontSize:9,textColor:40},
+    alternateRowStyles:{fillColor:[240,246,255]},
+    columnStyles:{0:{cellWidth:10,halign:'center'},4:{halign:'right'},6:{halign:'center'},7:{halign:'center'}},
+    didDrawPage:()=>pdfFooter(doc),
+    didParseCell(data){
+      if(data.section==='body' && data.column.index===6){
+        const v=data.cell.raw;
+        if(v==='ชำระแล้ว'){data.cell.styles.textColor=[46,125,50];data.cell.styles.fontStyle='bold';}
+        else if(v==='เกินกำหนด'){data.cell.styles.textColor=[183,28,28];data.cell.styles.fontStyle='bold';}
+        else if(v==='ค้างชำระ'){data.cell.styles.textColor=[230,81,0];data.cell.styles.fontStyle='bold';}
+      }
+    },
+    margin:{left:14,right:14}
+  });
+
+  const finalY = doc.lastAutoTable.finalY+8;
+  const paid = DB.invoices.filter(i=>i.status==='paid').reduce((s,i)=>s+(i.amount||0),0);
+  const unpaid = DB.invoices.filter(i=>i.status!=='paid').reduce((s,i)=>s+(i.amount||0),0);
+  doc.setFillColor(232,245,233); doc.roundedRect(14,finalY,75,14,2,2,'F');
+  doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(46,125,50);
+  doc.text(`รายได้รวม (ชำระแล้ว): ฿${paid.toLocaleString()}`,20,finalY+6);
+  doc.setFillColor(255,243,224); doc.roundedRect(95,finalY,75,14,2,2,'F');
+  doc.setTextColor(183,28,28);
+  doc.text(`ยังไม่ชำระ: ฿${unpaid.toLocaleString()}`,101,finalY+6);
+
+  doc.save('SpeakBright_ใบแจ้งหนี้.pdf');
+  showToast('ดาวน์โหลด PDF สำเร็จ ✅');
+}
+
+function exportSalaryPDF() {
+  if(typeof window.jspdf === 'undefined') { showToast('กำลังโหลด...'); return; }
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit:'mm', format:'a4' });
+
+  pdfHeader(doc, 'ค่าตอบแทน Teachers', 'Teacher Salary Report');
+
+  const body = (DB.salary||[]).map((s,i)=>[
+    i+1, s.teacher, s.month,
+    '฿'+(s.base||0).toLocaleString(),
+    s.bonus?'฿'+s.bonus.toLocaleString():'-',
+    '฿'+((s.base||0)+(s.bonus||0)).toLocaleString(),
+    s.paid?'จ่ายแล้ว':'ยังไม่จ่าย',
+    s.paidDate||'-'
+  ]);
+
+  doc.autoTable({
+    startY: 46,
+    head: [['#','Teacher','เดือน','เงินเดือน','โบนัส','รวม','สถานะ','วันที่จ่าย']],
+    body,
+    theme:'grid',
+    headStyles:{fillColor:[21,101,192],textColor:255,fontStyle:'bold',fontSize:9},
+    bodyStyles:{fontSize:9,textColor:40},
+    alternateRowStyles:{fillColor:[240,246,255]},
+    columnStyles:{0:{cellWidth:10,halign:'center'},3:{halign:'right'},4:{halign:'right'},5:{halign:'right'},6:{halign:'center'}},
+    didDrawPage:()=>pdfFooter(doc),
+    didParseCell(data){
+      if(data.section==='body'&&data.column.index===6){
+        if(data.cell.raw==='จ่ายแล้ว'){data.cell.styles.textColor=[46,125,50];data.cell.styles.fontStyle='bold';}
+        else{data.cell.styles.textColor=[230,81,0];data.cell.styles.fontStyle='bold';}
+      }
+    },
+    margin:{left:14,right:14}
+  });
+
+  const finalY = doc.lastAutoTable.finalY+8;
+  const total = (DB.salary||[]).reduce((s,x)=>s+(x.base||0)+(x.bonus||0),0);
+  doc.setFillColor(232,245,233); doc.roundedRect(14,finalY,90,14,2,2,'F');
+  doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(46,125,50);
+  doc.text(`ค่าตอบแทนรวมทั้งหมด: ฿${total.toLocaleString()}`,20,finalY+6);
+
+  doc.save('SpeakBright_ค่าตอบแทน.pdf');
+  showToast('ดาวน์โหลด PDF สำเร็จ ✅');
 }
 
 function openPrintWindow(html) {
