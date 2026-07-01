@@ -647,7 +647,7 @@ const firebaseConfig = {
 // ============================================================
 const FB_CONFIG_KEY = 'baangenius_fb_config';
 let fbdb = null;
-let _skipNextSnapshot = false;
+let _savingUntil = 0; // timestamp — block snapshots while saving
 
 function showLoading(msg) {
   const el = document.getElementById('loadingOverlay');
@@ -706,7 +706,7 @@ async function initFirebase(config) {
 
 function setupRealtimeSync() {
   fbdb.collection('school').doc('main').onSnapshot(snap => {
-    if (_skipNextSnapshot) { _skipNextSnapshot = false; hideLoading(); return; }
+    if (Date.now() < _savingUntil) { hideLoading(); return; }
     if (snap.exists) {
       const data = snap.data();
       // Deep merge into DB
@@ -787,7 +787,7 @@ function setupRealtimeSync() {
         hoursFixed = true;
       }
 
-      if (hadGhost || installmentFixed || coursesSynced || hoursFixed) { _skipNextSnapshot = true; saveDB(); }
+      if (hadGhost || installmentFixed || coursesSynced || hoursFixed) { saveDB(); }
       nextId.students = Math.max(...DB.students.map(s=>s.id), 0)+1;
       nextId.teachers = Math.max(...DB.teachers.map(t=>t.id), 0)+1;
       if(!DB.salary) DB.salary = [];
@@ -812,9 +812,10 @@ function setupRealtimeSync() {
 
 function saveDB() {
   if (fbdb) {
-    _skipNextSnapshot = true;
+    _savingUntil = Date.now() + 2500; // block snapshots for 2.5s while saving
     fbdb.collection('school').doc('main').set(JSON.parse(JSON.stringify(DB)))
-      .catch(e => { setSyncStatus(false); showToast('บันทึกไม่สำเร็จ: ' + e.message, ''); });
+      .then(() => { _savingUntil = Date.now() + 500; }) // after write, keep 0.5s buffer
+      .catch(e => { _savingUntil = 0; setSyncStatus(false); showToast('บันทึกไม่สำเร็จ: ' + e.message, ''); });
   } else {
     // Offline fallback
     localStorage.setItem('baangenius_db_offline', JSON.stringify(DB));
