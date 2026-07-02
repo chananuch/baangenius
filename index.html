@@ -711,14 +711,25 @@ function setupRealtimeSync() {
       const data = snap.data();
       // Deep merge into DB
       Object.keys(data).forEach(k => { if (Array.isArray(data[k])) DB[k] = data[k]; });
-      // One-time migration: remove ghost student ด.ช.แจ็ค นันทกิจ from all arrays
-      const ghostName = 'ด.ช.แจ็ค นันทกิจ';
-      const hadGhost = DB.students.some(s=>s.name===ghostName);
-      DB.students    = DB.students.filter(s=>s.name!==ghostName);
-      DB.attendance  = (DB.attendance||[]).filter(a=>a.student!==ghostName);
-      DB.invoices    = (DB.invoices||[]).filter(i=>i.student!==ghostName);
-      DB.makeup      = (DB.makeup||[]).filter(m=>m.student!==ghostName);
-      DB.enrollments = (DB.enrollments||[]).filter(e=>e.studentName!==ghostName);
+      // Migration: remove only the one confirmed ghost student (ด.ช.แจ็ค นันทกิจ)
+      const hadGhost = DB.students.some(s=>s.name==='ด.ช.แจ็ค นันทกิจ');
+      if (hadGhost) {
+        DB.students    = DB.students.filter(s=>s.name!=='ด.ช.แจ็ค นันทกิจ');
+        DB.attendance  = (DB.attendance||[]).filter(a=>a.student!=='ด.ช.แจ็ค นันทกิจ');
+        DB.invoices    = (DB.invoices||[]).filter(i=>i.student!=='ด.ช.แจ็ค นันทกิจ');
+        DB.makeup      = (DB.makeup||[]).filter(m=>m.student!=='ด.ช.แจ็ค นันทกิจ');
+        DB.enrollments = (DB.enrollments||[]).filter(e=>e.studentName!=='ด.ช.แจ็ค นันทกิจ');
+      }
+      // RESTORATION: add back data that was accidentally deleted
+      let restored = false;
+      const _RD = _RESTORE_DATA;
+      _RD.students.forEach(r=>{ if(!DB.students.find(s=>s.name===r.name)){ DB.students.push(r); restored=true; } });
+      _RD.teachers.forEach(r=>{ if(!DB.teachers.find(t=>t.name===r.name)){ DB.teachers.push(r); restored=true; } });
+      _RD.courses.forEach(r=>{ if(!DB.courses.find(c=>c.name===r.name)){ DB.courses.push(r); restored=true; } });
+      _RD.enrollments.forEach(r=>{ if(!DB.enrollments.find(e=>e.studentName===r.studentName&&e.courseName===r.courseName)){ DB.enrollments.push(r); restored=true; } });
+      _RD.invoices.forEach(r=>{ if(!DB.invoices.find(i=>i.student===r.student&&i.course===r.course&&i.month===r.month)){ DB.invoices.push(r); restored=true; } });
+      _RD.salary.forEach(r=>{ if(!DB.salary.find(s=>s.teacher===r.teacher&&s.month===r.month)){ DB.salary.push(r); restored=true; } });
+      _RD.attendance.forEach(r=>{ if(!DB.attendance.find(a=>a.student===r.student&&a.course===r.course&&a.date===r.date)){ DB.attendance.push(r); restored=true; } });
       // Migration: fix any installment with amount=0 or wrong total
       let installmentFixed = false;
       (DB.enrollments||[]).forEach(enr => {
@@ -787,7 +798,7 @@ function setupRealtimeSync() {
         hoursFixed = true;
       }
 
-      if (hadGhost || installmentFixed || coursesSynced || hoursFixed) { saveDB(); }
+      if (hadGhost || restored || installmentFixed || coursesSynced || hoursFixed) { saveDB(); }
       nextId.students = Math.max(...DB.students.map(s=>s.id), 0)+1;
       nextId.teachers = Math.max(...DB.teachers.map(t=>t.id), 0)+1;
       if(!DB.salary) DB.salary = [];
@@ -857,66 +868,135 @@ function showFirebaseSettings() {
 }
 
 // ============================================================
+// DATA RESTORATION (data accidentally deleted — restore on load)
+// ============================================================
+const _RESTORE_DATA = {
+  students: [
+    {id:100,name:'จิว',nickname:'จิว',phone:'',parent:'แม่จอย',courses:['speaking 1'],status:'active',joined:'2026-01-01'},
+    {id:101,name:'ปาล์มมี่',nickname:'ปาล์มมี่',phone:'',parent:'ป้าเอ๋',courses:['speaking 1'],status:'active',joined:'2026-01-01'},
+    {id:102,name:'นิชา',nickname:'นิชา',phone:'',parent:'แม่บี',courses:['speaking 1'],status:'active',joined:'2026-01-01'},
+    {id:103,name:'การ์ฟิว',nickname:'การ์ฟิว',phone:'0631523529',parent:'',courses:['speaking 1'],status:'active',joined:'2026-01-01'},
+    {id:104,name:'วันใหม่',nickname:'วันใหม่',phone:'',parent:'',courses:['speaking 1'],status:'active',joined:'2026-01-01'},
+    {id:105,name:'อันนา',nickname:'อันนา',phone:'0613049250',parent:'',courses:['speaking 1'],status:'active',joined:'2026-01-01'},
+    {id:106,name:'สตางค์',nickname:'สตางค์',phone:'',parent:'',courses:['speaking 1'],status:'active',joined:'2026-01-01'},
+    {id:107,name:'โอชิน',nickname:'โอชิน',phone:'',parent:'',courses:['speaking 2'],status:'active',joined:'2026-01-01'},
+    {id:108,name:'ข้าวนึ่ง',nickname:'ข้าวนึ่ง',phone:'',parent:'',courses:['speaking 2'],status:'active',joined:'2026-01-01'},
+    {id:109,name:'ดีพร้อม',nickname:'ดีพร้อม',phone:'084-1117795',parent:'',courses:['speaking 2'],status:'active',joined:'2026-01-01'},
+    {id:110,name:'แสนดี',nickname:'แสนดี',phone:'084-1117795',parent:'',courses:['phonics 3'],status:'active',joined:'2026-01-01'},
+    {id:111,name:'โปรด',nickname:'โปรด',phone:'089-4814997',parent:'',courses:['speaking 2'],status:'active',joined:'2026-01-01'},
+    {id:112,name:'อชิ',nickname:'อชิ',phone:'',parent:'',courses:['phonics 3'],status:'active',joined:'2026-01-01'},
+    {id:113,name:'ซัน',nickname:'ซัน',phone:'',parent:'',courses:['phonics 3'],status:'active',joined:'2026-01-01'},
+    {id:114,name:'มิเกล',nickname:'มิเกล',phone:'',parent:'',courses:['phonics 3'],status:'active',joined:'2026-01-01'},
+    {id:115,name:'ณดา',nickname:'ณดา',phone:'',parent:'',courses:['phonics 3'],status:'active',joined:'2026-01-01'},
+    {id:116,name:'กัปตัน',nickname:'กัปตัน',phone:'0928584142',parent:'',courses:['phonics 1'],status:'active',joined:'2026-01-01'},
+    {id:117,name:'ออมสิน',nickname:'ออมสิน',phone:'0986498564',parent:'',courses:['phonics 1'],status:'active',joined:'2026-01-01'},
+    {id:118,name:'โอปอล',nickname:'โอปอล',phone:'0898019577',parent:'',courses:['phonics 1'],status:'active',joined:'2026-01-01'},
+    {id:119,name:'ธาม',nickname:'ธาม',phone:'0865526796',parent:'',courses:['phonics 1'],status:'active',joined:'2026-01-01'},
+    {id:120,name:'อัยมี่',nickname:'อัยมี่',phone:'093-2203816',parent:'',courses:['phonics 1'],status:'active',joined:'2026-01-01'},
+    {id:121,name:'โอโซน',nickname:'โอโซน',phone:'097-0104611',parent:'',courses:['phonics 1'],status:'active',joined:'2026-01-01'},
+    {id:122,name:'ณิชา',nickname:'ณิชา',phone:'0926866139',parent:'',courses:['phonics 1'],status:'active',joined:'2026-01-01'},
+    {id:123,name:'อาลีฟ',nickname:'อาลีฟ',phone:'081-3969429',parent:'',courses:['phonics 1'],status:'active',joined:'2026-01-01'},
+    {id:124,name:'ไนท์',nickname:'ไนท์',phone:'064-9524978',parent:'',courses:['Phonics 2'],status:'active',joined:'2026-01-01'},
+    {id:125,name:'คุณ',nickname:'กนกฉัตร ชนะชมภู',phone:'064-7934847',parent:'',courses:['Phonics 2'],status:'active',joined:'2026-01-01'},
+    {id:126,name:'ภูผา',nickname:'ภูผา',phone:'',parent:'',courses:['Phonics 2'],status:'active',joined:'2026-01-01'},
+    {id:127,name:'ไอย์',nickname:'ปรัชญา สังวาลย์เล็ก',phone:'092-5617661',parent:'',courses:['Phonics 2'],status:'active',joined:'2026-01-01'},
+    {id:128,name:'มาร์เน่',nickname:'กวินธิดา หอมจิตร์',phone:'0618210159',parent:'',courses:['Phonics 2'],status:'active',joined:'2026-01-01'},
+    {id:129,name:'ทิวทัศน์',nickname:'ทิวทัศน์',phone:'0805160059',parent:'',courses:['Phonics 2'],status:'active',joined:'2026-01-01'},
+    {id:130,name:'ไทเกอร์',nickname:'กิตติภัทร ผาหยาด',phone:'089-9810790',parent:'',courses:['Phonics 2'],status:'active',joined:'2026-01-01'},
+    {id:131,name:'ลลิน',nickname:'ลลิน',phone:'098-4752242',parent:'',courses:['Phonics 2'],status:'active',joined:'2026-01-01'},
+    {id:132,name:'โนเบล',nickname:'โนเบล',phone:'0899213232',parent:'',courses:['Phonics 4'],status:'active',joined:'2026-01-01'},
+    {id:133,name:'เสือ',nickname:'เสือ',phone:'093-609-3474',parent:'',courses:['phonics 3'],status:'active',joined:'2026-01-01'},
+    {id:134,name:'ไท',nickname:'ไท',phone:'0865499732',parent:'',courses:['Phonics 4'],status:'active',joined:'2026-01-01'},
+    {id:135,name:'แทน',nickname:'แทน',phone:'0865499732',parent:'',courses:['Phonics 4'],status:'active',joined:'2026-01-01'},
+    {id:136,name:'อะตอม',nickname:'อะตอม',phone:'0990453223',parent:'',courses:['Phonics 4'],status:'active',joined:'2026-01-01'},
+    {id:137,name:'บีม',nickname:'บีม',phone:'0968269268',parent:'',courses:['Phonics 4'],status:'active',joined:'2026-01-01'},
+    {id:138,name:'เบล',nickname:'เบล',phone:'0968269268',parent:'',courses:['Phonics 4'],status:'active',joined:'2026-01-01'},
+    {id:139,name:'วุ้นเส้น',nickname:'วุ้นเส้น',phone:'0950462954',parent:'',courses:['phonics 3'],status:'active',joined:'2026-01-01'},
+    {id:140,name:'ร็อคเก็ต',nickname:'ร็อคเก็ต',phone:'0863254340',parent:'',courses:['Phonics 4'],status:'active',joined:'2026-01-01'},
+    {id:141,name:'บุญบุญ',nickname:'บุญบุญ',phone:'0807748475',parent:'',courses:['phonics 3'],status:'active',joined:'2026-01-01'},
+    {id:142,name:'น้ำขิง',nickname:'น้ำขิง',phone:'0943931561',parent:'',courses:['speaking 2'],status:'active',joined:'2026-01-01'},
+  ],
+  teachers: [],
+  courses: [
+    {id:200,name:'Phonics 2',teacher:'',students:8,fee:2000,sessions:4,day:'',time:'',color:'#9C27B0'},
+    {id:201,name:'Phonics 4',teacher:'',students:7,fee:2000,sessions:4,day:'',time:'',color:'#009688'},
+    {id:202,name:'phonics 1',teacher:'',students:8,fee:2000,sessions:4,day:'',time:'',color:'#FF9800'},
+    {id:203,name:'phonics 3',teacher:'',students:8,fee:2000,sessions:4,day:'',time:'',color:'#F44336'},
+    {id:204,name:'speaking 1',teacher:'',students:7,fee:2000,sessions:4,day:'',time:'',color:'#2196F3'},
+    {id:205,name:'speaking 2',teacher:'',students:5,fee:2000,sessions:4,day:'',time:'',color:'#4CAF50'},
+  ],
+  enrollments: [
+    {id:200,studentName:'จิว',courseName:'speaking 1',paymentType:'package',fee:2000,totalHours:24,usedHours:22,nextResetDate:null,installments:[],status:'active',startDate:'2026-01-01'},
+    {id:201,studentName:'ปาล์มมี่',courseName:'speaking 1',paymentType:'package',fee:2000,totalHours:24,usedHours:24,nextResetDate:null,installments:[],status:'active',startDate:'2026-01-01'},
+    {id:202,studentName:'นิชา',courseName:'speaking 1',paymentType:'package',fee:2000,totalHours:24,usedHours:24,nextResetDate:null,installments:[],status:'active',startDate:'2026-01-01'},
+    {id:203,studentName:'การ์ฟิว',courseName:'speaking 1',paymentType:'package',fee:2000,totalHours:24,usedHours:24,nextResetDate:null,installments:[],status:'active',startDate:'2026-01-01'},
+    {id:204,studentName:'วันใหม่',courseName:'speaking 1',paymentType:'package',fee:2000,totalHours:24,usedHours:22,nextResetDate:null,installments:[],status:'active',startDate:'2026-01-01'},
+    {id:205,studentName:'อันนา',courseName:'speaking 1',paymentType:'package',fee:2000,totalHours:24,usedHours:22,nextResetDate:null,installments:[],status:'active',startDate:'2026-01-01'},
+    {id:206,studentName:'สตางค์',courseName:'speaking 1',paymentType:'package',fee:2000,totalHours:24,usedHours:24,nextResetDate:null,installments:[],status:'active',startDate:'2026-01-01'},
+    {id:207,studentName:'โอชิน',courseName:'speaking 2',paymentType:'package',fee:2000,totalHours:24,usedHours:24,nextResetDate:null,installments:[],status:'active',startDate:'2026-01-01'},
+    {id:208,studentName:'ข้าวนึ่ง',courseName:'speaking 2',paymentType:'package',fee:2000,totalHours:24,usedHours:24,nextResetDate:null,installments:[],status:'active',startDate:'2026-01-01'},
+    {id:209,studentName:'ดีพร้อม',courseName:'speaking 2',paymentType:'package',fee:2000,totalHours:24,usedHours:24,nextResetDate:null,installments:[],status:'active',startDate:'2026-01-01'},
+    {id:210,studentName:'แสนดี',courseName:'phonics 3',paymentType:'package',fee:2000,totalHours:24,usedHours:24,nextResetDate:null,installments:[],status:'active',startDate:'2026-01-01'},
+    {id:211,studentName:'โปรด',courseName:'speaking 2',paymentType:'package',fee:2000,totalHours:24,usedHours:8,nextResetDate:null,installments:[],status:'active',startDate:'2026-01-01'},
+    {id:212,studentName:'อชิ',courseName:'phonics 3',paymentType:'package',fee:2000,totalHours:24,usedHours:24,nextResetDate:null,installments:[],status:'active',startDate:'2026-01-01'},
+    {id:213,studentName:'ซัน',courseName:'phonics 3',paymentType:'package',fee:2000,totalHours:24,usedHours:6,nextResetDate:null,installments:[],status:'active',startDate:'2026-01-01'},
+    {id:214,studentName:'มิเกล',courseName:'phonics 3',paymentType:'package',fee:2000,totalHours:24,usedHours:6,nextResetDate:null,installments:[],status:'active',startDate:'2026-01-01'},
+    {id:215,studentName:'ณดา',courseName:'phonics 3',paymentType:'package',fee:2000,totalHours:24,usedHours:8,nextResetDate:null,installments:[],status:'active',startDate:'2026-01-01'},
+    {id:216,studentName:'กัปตัน',courseName:'phonics 1',paymentType:'package',fee:2000,totalHours:24,usedHours:22,nextResetDate:null,installments:[],status:'active',startDate:'2026-01-01'},
+    {id:217,studentName:'ออมสิน',courseName:'phonics 1',paymentType:'package',fee:2000,totalHours:24,usedHours:24,nextResetDate:null,installments:[],status:'active',startDate:'2026-01-01'},
+    {id:218,studentName:'โอปอล',courseName:'phonics 1',paymentType:'package',fee:2000,totalHours:24,usedHours:24,nextResetDate:null,installments:[],status:'active',startDate:'2026-01-01'},
+    {id:219,studentName:'ธาม',courseName:'phonics 1',paymentType:'package',fee:2000,totalHours:24,usedHours:24,nextResetDate:null,installments:[],status:'active',startDate:'2026-01-01'},
+    {id:220,studentName:'อัยมี่',courseName:'phonics 1',paymentType:'package',fee:2000,totalHours:24,usedHours:24,nextResetDate:null,installments:[],status:'active',startDate:'2026-01-01'},
+    {id:221,studentName:'โอโซน',courseName:'phonics 1',paymentType:'package',fee:2000,totalHours:24,usedHours:24,nextResetDate:null,installments:[],status:'active',startDate:'2026-01-01'},
+    {id:222,studentName:'ณิชา',courseName:'phonics 1',paymentType:'package',fee:2000,totalHours:24,usedHours:10,nextResetDate:null,installments:[],status:'active',startDate:'2026-01-01'},
+    {id:223,studentName:'อาลีฟ',courseName:'phonics 1',paymentType:'package',fee:2000,totalHours:24,usedHours:10,nextResetDate:null,installments:[],status:'active',startDate:'2026-01-01'},
+    {id:224,studentName:'ไนท์',courseName:'Phonics 2',paymentType:'package',fee:2000,totalHours:24,usedHours:24,nextResetDate:null,installments:[],status:'active',startDate:'2026-01-01'},
+    {id:225,studentName:'คุณ',courseName:'Phonics 2',paymentType:'package',fee:2000,totalHours:24,usedHours:24,nextResetDate:null,installments:[],status:'active',startDate:'2026-01-01'},
+    {id:226,studentName:'ภูผา',courseName:'Phonics 2',paymentType:'package',fee:2000,totalHours:24,usedHours:24,nextResetDate:null,installments:[],status:'active',startDate:'2026-01-01'},
+    {id:227,studentName:'ไอย์',courseName:'Phonics 2',paymentType:'package',fee:2000,totalHours:24,usedHours:8,nextResetDate:null,installments:[],status:'active',startDate:'2026-01-01'},
+    {id:228,studentName:'มาร์เน่',courseName:'Phonics 2',paymentType:'package',fee:2000,totalHours:24,usedHours:24,nextResetDate:null,installments:[],status:'active',startDate:'2026-01-01'},
+    {id:229,studentName:'ทิวทัศน์',courseName:'Phonics 2',paymentType:'package',fee:2000,totalHours:24,usedHours:14,nextResetDate:null,installments:[],status:'active',startDate:'2026-01-01'},
+    {id:230,studentName:'ไทเกอร์',courseName:'Phonics 2',paymentType:'package',fee:2000,totalHours:24,usedHours:14,nextResetDate:null,installments:[],status:'active',startDate:'2026-01-01'},
+    {id:231,studentName:'ลลิน',courseName:'Phonics 2',paymentType:'package',fee:2000,totalHours:24,usedHours:22,nextResetDate:null,installments:[],status:'active',startDate:'2026-01-01'},
+    {id:232,studentName:'โนเบล',courseName:'Phonics 4',paymentType:'package',fee:2000,totalHours:24,usedHours:0,nextResetDate:null,installments:[],status:'active',startDate:'2026-01-01'},
+    {id:233,studentName:'เสือ',courseName:'phonics 3',paymentType:'package',fee:2000,totalHours:24,usedHours:20,nextResetDate:null,installments:[],status:'active',startDate:'2026-01-01'},
+    {id:234,studentName:'ไท',courseName:'Phonics 4',paymentType:'package',fee:2000,totalHours:24,usedHours:0,nextResetDate:null,installments:[],status:'active',startDate:'2026-01-01'},
+    {id:235,studentName:'แทน',courseName:'Phonics 4',paymentType:'package',fee:2000,totalHours:24,usedHours:0,nextResetDate:null,installments:[],status:'active',startDate:'2026-01-01'},
+    {id:236,studentName:'อะตอม',courseName:'Phonics 4',paymentType:'package',fee:2000,totalHours:24,usedHours:0,nextResetDate:null,installments:[],status:'active',startDate:'2026-01-01'},
+    {id:237,studentName:'บีม',courseName:'Phonics 4',paymentType:'package',fee:2000,totalHours:24,usedHours:0,nextResetDate:null,installments:[],status:'active',startDate:'2026-01-01'},
+    {id:238,studentName:'เบล',courseName:'Phonics 4',paymentType:'package',fee:2000,totalHours:24,usedHours:0,nextResetDate:null,installments:[],status:'active',startDate:'2026-01-01'},
+    {id:239,studentName:'วุ้นเส้น',courseName:'phonics 3',paymentType:'package',fee:2000,totalHours:24,usedHours:24,nextResetDate:null,installments:[],status:'active',startDate:'2026-01-01'},
+    {id:240,studentName:'ร็อคเก็ต',courseName:'Phonics 4',paymentType:'package',fee:2000,totalHours:24,usedHours:0,nextResetDate:null,installments:[],status:'active',startDate:'2026-01-01'},
+    {id:241,studentName:'บุญบุญ',courseName:'phonics 3',paymentType:'package',fee:2000,totalHours:24,usedHours:2,nextResetDate:null,installments:[],status:'active',startDate:'2026-01-01'},
+    {id:242,studentName:'น้ำขิง',courseName:'speaking 2',paymentType:'package',fee:2000,totalHours:24,usedHours:0,nextResetDate:null,installments:[],status:'active',startDate:'2026-01-01'},
+  ],
+  invoices: [
+    {id:200,student:'จิว',course:'speaking 1',amount:2000,month:'กรกฎาคม 2569',status:'unpaid',due:'2026-07-31'},
+    {id:201,student:'นิชา',course:'speaking 1',amount:2000,month:'กรกฎาคม 2569',status:'unpaid',due:'2026-07-31'},
+    {id:202,student:'วันใหม่',course:'speaking 1',amount:2000,month:'กรกฎาคม 2569',status:'unpaid',due:'2026-07-31'},
+    {id:203,student:'สตางค์',course:'speaking 1',amount:2000,month:'กรกฎาคม 2569',status:'unpaid',due:'2026-07-31'},
+    {id:204,student:'คุณ',course:'Phonics 2',amount:2000,month:'กรกฎาคม 2569',status:'unpaid',due:'2026-07-31'},
+    {id:205,student:'อะตอม',course:'Phonics 4',amount:3900,month:'กรกฎาคม 2569',status:'unpaid',due:'2026-07-31'},
+    {id:206,student:'วุ้นเส้น',course:'phonics 3',amount:2000,month:'กรกฎาคม 2569',status:'unpaid',due:'2026-07-31'},
+  ],
+  salary: [],
+  attendance: [],
+};
+
+// ============================================================
 // DATA STORE
 // ============================================================
 const DB = {
-  students: [
-    { id:1, name:'น้องอรัญ', nickname:'อรัญ', phone:'081-234-5678', parent:'คุณแม่สมใจ', courses:['คณิตศาสตร์ ม.1','ภาษาอังกฤษ'], status:'active', joined:'2025-01-10', balance:0 },
-    { id:2, name:'ด.ช.ภูมิ วงศ์ดี', nickname:'ภูมิ', phone:'082-345-6789', parent:'คุณพ่อวิชัย', courses:['วิทยาศาสตร์','คณิตศาสตร์ ม.1'], status:'active', joined:'2025-02-15', balance:1500 },
-    { id:3, name:'ด.ญ.มินา ศรีสุข', nickname:'มินา', phone:'083-456-7890', parent:'คุณแม่พรทิพย์', courses:['ภาษาอังกฤษ'], status:'active', joined:'2025-01-20', balance:0 },
-    { id:5, name:'ด.ญ.ฟ้า ใจดี', nickname:'ฟ้า', phone:'085-678-9012', parent:'คุณแม่สุดา', courses:['ภาษาอังกฤษ','ศิลปะ'], status:'active', joined:'2025-02-28', balance:0 },
-    { id:6, name:'ด.ช.ก้อง มีสุข', nickname:'ก้อง', phone:'086-789-0123', parent:'คุณพ่อประสิทธิ์', courses:['วิทยาศาสตร์'], status:'inactive', joined:'2024-10-01', balance:0 },
-  ],
-  teachers: [
-    { id:1, name:'ครูปาล', fullname:'ปาลิดา สมบูรณ์', subject:'คณิตศาสตร์', phone:'089-111-2222', salary:25000, status:'active', since:'2023-06-01' },
-    { id:2, name:'ครูนอย', fullname:'น้อย วงศ์ศรี', subject:'ภาษาอังกฤษ', phone:'089-222-3333', salary:22000, status:'active', since:'2023-08-15' },
-    { id:3, name:'ครูต้อม', fullname:'ต้อม จิตรโอภาส', subject:'วิทยาศาสตร์', phone:'089-333-4444', salary:24000, status:'active', since:'2024-01-01' },
-    { id:4, name:'ครูจ๋า', fullname:'จรัสศรี ทองดี', subject:'ศิลปะ', phone:'089-444-5555', salary:20000, status:'active', since:'2024-03-01' },
-  ],
-  courses: [
-    { id:1, name:'คณิตศาสตร์ ม.1', teacher:'ครูปาล', students:8, fee:2500, sessions:4, day:'จ-พ', time:'16:00-18:00', color:'#2196F3' },
-    { id:2, name:'ภาษาอังกฤษ', teacher:'ครูนอย', students:10, fee:3000, sessions:4, day:'อ-ศ', time:'15:00-17:00', color:'#4CAF50' },
-    { id:3, name:'วิทยาศาสตร์', teacher:'ครูต้อม', students:6, fee:2800, sessions:2, day:'พ', time:'14:00-17:00', color:'#FF9800' },
-    { id:4, name:'ศิลปะ', teacher:'ครูจ๋า', students:5, fee:2000, sessions:2, day:'ส', time:'10:00-12:00', color:'#9C27B0' },
-    { id:5, name:'Programming ขั้นต้น', teacher:'ครูปาล', students:4, fee:3500, sessions:2, day:'อา', time:'10:00-12:00', color:'#F44336' },
-  ],
-  attendance: [
-    { id:1, student:'น้องอรัญ', course:'คณิตศาสตร์ ม.1', date:'2026-06-02', status:'present' },
-    { id:2, student:'ด.ช.ภูมิ วงศ์ดี', course:'คณิตศาสตร์ ม.1', date:'2026-06-02', status:'present' },
-    { id:4, student:'น้องอรัญ', course:'ภาษาอังกฤษ', date:'2026-06-03', status:'present' },
-    { id:5, student:'ด.ญ.มินา ศรีสุข', course:'ภาษาอังกฤษ', date:'2026-06-03', status:'leave' },
-  ],
-  invoices: [
-    { id:1, student:'ด.ช.ภูมิ วงศ์ดี', course:'วิทยาศาสตร์', amount:2800, month:'มิถุนายน 2569', status:'unpaid', due:'2026-06-10' },
-    { id:3, student:'น้องอรัญ', course:'คณิตศาสตร์ ม.1', amount:2500, month:'พฤษภาคม 2569', status:'paid', due:'2026-05-10' },
-    { id:4, student:'ด.ญ.มินา ศรีสุข', course:'ภาษาอังกฤษ', amount:3000, month:'พฤษภาคม 2569', status:'paid', due:'2026-05-10' },
-    { id:5, student:'ด.ญ.ฟ้า ใจดี', course:'ภาษาอังกฤษ', amount:3000, month:'มิถุนายน 2569', status:'overdue', due:'2026-06-01' },
-    { id:6, student:'ด.ญ.ฟ้า ใจดี', course:'ศิลปะ', amount:2000, month:'มิถุนายน 2569', status:'paid', due:'2026-06-05' },
-  ],
-  makeup: [
-    { id:2, student:'ด.ญ.มินา ศรีสุข', course:'ภาษาอังกฤษ', from:'2026-06-03 อ 15:00', to:'2026-06-07 ส 10:00', status:'pending', created:'03 มิ.ย. 2569' },
-  ],
-  salary: [
-    { id:1, teacher:'ครูปาล', month:'มิ.ย. 2569', base:25000, bonus:2500, paid:false },
-    { id:2, teacher:'ครูนอย', month:'มิ.ย. 2569', base:22000, bonus:0, paid:false },
-    { id:3, teacher:'ครูต้อม', month:'มิ.ย. 2569', base:24000, bonus:1000, paid:true },
-    { id:4, teacher:'ครูจ๋า', month:'มิ.ย. 2569', base:20000, bonus:0, paid:true },
-  ],
-  announcements: [
-    { id:1, title:'วันหยุดราชการ', body:'โรงเรียนหยุดวันที่ 5 มิ.ย. 2569 เนื่องจากวันสำคัญของชาติ', date:'01 มิ.ย. 2569', target:'ทุกคน' },
-    { id:2, title:'ปรับเวลาเรียนภาษาอังกฤษ', body:'ตั้งแต่สัปดาห์นี้ คลาสภาษาอังกฤษปรับเวลาเป็น 15:30-17:30 น.', date:'03 มิ.ย. 2569', target:'ภาษาอังกฤษ' },
-  ],
-  enrollments: [
-    { id:1, studentName:'น้องอรัญ', courseName:'คณิตศาสตร์ ม.1', paymentType:'monthly', fee:2500, totalHours:8, usedHours:2, nextResetDate:'2026-07-01', installments:[], status:'active', startDate:'2026-06-01' },
-    { id:2, studentName:'ด.ช.ภูมิ วงศ์ดี', courseName:'วิทยาศาสตร์', paymentType:'package', fee:8400, totalHours:12, usedHours:3, nextResetDate:null, installments:[{id:1,amount:2800,due:'2026-06-01',paid:true},{id:2,amount:2800,due:'2026-07-01',paid:false},{id:3,amount:2800,due:'2026-08-01',paid:false}], status:'active', startDate:'2026-06-01' },
-    { id:3, studentName:'ด.ญ.มินา ศรีสุข', courseName:'ภาษาอังกฤษ', paymentType:'monthly', fee:3000, totalHours:8, usedHours:6, nextResetDate:'2026-07-01', installments:[], status:'active', startDate:'2026-05-01' },
-    { id:4, studentName:'ด.ญ.ฟ้า ใจดี', courseName:'ภาษาอังกฤษ', paymentType:'package', fee:9000, totalHours:10, usedHours:4, nextResetDate:null, installments:[{id:1,amount:4500,due:'2026-05-01',paid:true},{id:2,amount:4500,due:'2026-06-01',paid:false}], status:'active', startDate:'2026-05-01' },
-  ],
-  holidays: [
-    { id:1, name:'วันสำคัญของชาติ', from:'2026-06-05', to:'2026-06-05' },
-    { id:2, name:'วันหยุดพิเศษ', from:'2026-06-22', to:'2026-06-23' },
-    { id:3, name:'ปิดเทอม', from:'2026-07-01', to:'2026-07-15' },
-  ],
+  students: [],
+  teachers: [],
+  courses: [],
+  attendance: [],
+  invoices: [],
+  makeup: [],
+  salary: [],
+  announcements: [],
+  enrollments: [],
+  holidays: [],
 };
 
 let attendanceState = {};
