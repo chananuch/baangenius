@@ -188,9 +188,9 @@
   .schedule-grid { display: grid; grid-template-columns: 60px repeat(7, 1fr); gap: 2px; font-size: 12px; }
   .sch-header { background: var(--primary); color: #fff; padding: 8px 4px; text-align: center; border-radius: 4px; font-weight: 700; }
   .sch-time { background: var(--gray-100); padding: 8px 4px; text-align: center; color: var(--gray-700); border-radius: 4px; font-size: 11px; }
-  .sch-cell { background: var(--gray-100); min-height: 40px; border-radius: 4px; position: relative; }
+  .sch-cell { background: var(--gray-100); min-height: 40px; border-radius: 4px; display: flex; flex-direction: column; gap: 2px; padding: 2px; }
   .sch-event {
-    position: absolute; inset: 2px; border-radius: 4px;
+    border-radius: 4px;
     padding: 4px 6px; font-size: 11px; font-weight: 600; cursor: pointer;
     overflow: hidden; line-height: 1.3;
   }
@@ -2075,13 +2075,14 @@ function renderSchedule(el) {
         ${times.map(t=>`
           <div class="sch-time">${t}</div>
           ${days.map((_,di)=>{
-            const event = DB.courses.find(c=>{
+            const events = DB.courses.filter(c=>{
+              if (!c.day || !c.time) return false;
               const cdays = c.day.split('-').map(d=>d.trim());
-              const [sh,sm] = (c.time.split('-')[0]||'00:00').split(':').map(Number);
+              const [sh] = (c.time.split('-')[0]||'00:00').split(':').map(Number);
               const th = Number(t.split(':')[0]);
               return cdays.some(d=>dayMap[d]===di) && th===sh;
             });
-            return `<div class="sch-cell">${event?`<div class="sch-event" style="background:${event.color}22;color:${event.color};border-left:3px solid ${event.color}" onclick="openCourseStudents(${event.id})">${event.name}<br><small>${event.teacher}</small></div>`:''}</div>`;
+            return `<div class="sch-cell">${events.map(event=>`<div class="sch-event" style="background:${event.color}22;color:${event.color};border-left:3px solid ${event.color}" onclick="openCourseStudents(${event.id})">${event.name}<br><small>${event.teacher}</small></div>`).join('')}</div>`;
           }).join('')}
         `).join('')}
       </div>
@@ -2277,8 +2278,8 @@ function renderEnrollment(el) {
       const enrollments = DB.enrollments.filter(e=>e.courseName===course.name && e.status==='active' && (!q||e.studentName.toLowerCase().includes(q.toLowerCase())));
       if (!enrollments.length && q) return;
       const key = 'acc_' + course.name.replace(/\s/g,'_');
-      // Open by default if searching, or if previously opened
-      const isOpen = q ? true : (window.enrollAccordionState[key] !== false);
+      // Collapsed by default; open only if user expanded it or is searching
+      const isOpen = q ? true : (window.enrollAccordionState[key] === true);
       const lowHours = enrollments.some(e => e.totalHours > 0 && Math.max(0,e.totalHours-e.usedHours) <= e.totalHours*(1/3));
       html += `
         <div style="margin-bottom:10px;border:1.5px solid var(--gray-200);border-radius:12px;overflow:hidden">
@@ -2375,6 +2376,7 @@ function enrollCardHTML(e) {
     ${payInfo}
     <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap">
       <button class="btn btn-sm" style="background:var(--primary-light,#e8f0fe);color:var(--primary);border:none;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:12px" onclick="openTransferCourse(${e.id})">🔀 ย้ายคอร์ส</button>
+      <button class="btn btn-sm owner-only" style="background:#e8f5e9;color:#2e7d32;border:none;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:12px" onclick="resetEnrollHours(${e.id})" title="รีเซตชั่วโมงเป็น 0">🔄 รีเซตชั่วโมง</button>
       <button class="btn btn-icon btn-sm" title="แก้ไข" onclick="openEditEnrollment(${e.id})">✏️</button>
       <button class="btn btn-icon btn-sm" title="ลบ" onclick="deleteEnrollment(${e.id})" style="color:var(--danger)">🗑️</button>
     </div>
@@ -2587,6 +2589,16 @@ function deleteEnrollment(id) {
   showToast('ลบการลงทะเบียนสำเร็จ');
 }
 
+function resetEnrollHours(id) {
+  const e = DB.enrollments.find(x=>x.id===id);
+  if (!e) return;
+  if (!confirm(`รีเซตชั่วโมงของ ${e.studentName} (${e.courseName}) เป็น 0?`)) return;
+  e.usedHours = 0;
+  saveDB();
+  renderEnrollment(document.getElementById('mainContent'));
+  showToast(`รีเซตชั่วโมง ${e.studentName} สำเร็จ 🔄`);
+}
+
 // ============================================================
 // MAKEUP
 // ============================================================
@@ -2758,7 +2770,12 @@ function renderFinance(el) {
     `;
   }
 
+  const isAssistant = currentRole === 'assistant';
+  const defaultTab = isAssistant ? 'unpaid' : 'ทั้งหมด';
+  const visibleTabs = isAssistant ? ['unpaid'] : statusTabs;
+
   el.innerHTML = `
+    ${isAssistant ? '' : `
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px">
       <div>
         <div style="font-size:13px;color:var(--gray-500)">รายได้เดือนนี้</div>
@@ -2770,12 +2787,12 @@ function renderFinance(el) {
         <button class="btn btn-outline btn-sm" onclick="printFinanceTable()">🖨️ พิมพ์</button>
         <button class="btn btn-primary owner-only" onclick="openAddInvoice()">+ สร้างใบแจ้งหนี้</button>
       </div>
-    </div>
-    <div class="tabs" id="financeTabs">
-      ${statusTabs.map(t=>`<button class="tab-btn ${t==='ทั้งหมด'?'active':''}" onclick="switchFinanceTab('${t}',this)">${t==='ทั้งหมด'?'ทั้งหมด':statusLabel[t]}</button>`).join('')}
-    </div>
+    </div>`}
+    ${isAssistant ? '' : `<div class="tabs" id="financeTabs">
+      ${visibleTabs.map(t=>`<button class="tab-btn ${t===defaultTab?'active':''}" onclick="switchFinanceTab('${t}',this)">${t==='ทั้งหมด'?'ทั้งหมด':statusLabel[t]}</button>`).join('')}
+    </div>`}
     <div class="card" id="invoiceTableWrap">
-      ${renderInvoiceTable('ทั้งหมด')}
+      ${renderInvoiceTable(defaultTab)}
     </div>
   `;
 }
@@ -3608,7 +3625,7 @@ function deleteAnnouncement(id) {
 // ============================================================
 const PINS = { owner: '0405', assistant: '0202' };
 let currentRole = 'owner';
-const ASSISTANT_PAGES = new Set(['dashboard','students','attendance','enrollment','makeup','progress']);
+const ASSISTANT_PAGES = new Set(['dashboard','students','attendance','enrollment','makeup','progress','finance','courses','schedule']);
 let pinEntry = '';
 
 function pinPress(d) {
